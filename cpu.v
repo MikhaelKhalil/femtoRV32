@@ -20,7 +20,7 @@ wire [31:0] pc_shifted_flow;
 wire branch, memread, memwrite, alusrc, regwrite, memtoreg;
 wire [1:0] aluop;
 wire [3:0] alu_selected;
-wire zf;
+wire cf, zf, vf, sf;
 wire arewebranching;
 
 wire [13:0] control_signals;
@@ -42,10 +42,11 @@ Mem memory (
     .data_out(mem_data)
     );
 
+// TODO:
 /* Combinational => no need to define clock behavior */
 ControlUnit control(
-    .Inst(instr[6:2]),
-	.Branch(branch),
+    .Inst(instr[`IR_opcode]),
+	.BranchZero(branch),
 	.MemRead(memread),
 	.MemtoReg(memtoreg),
 	.ALUOp(aluop),
@@ -59,9 +60,9 @@ ControlUnit control(
 RegFile registers(
 	.clk(clk),
 	.rst(rst),
-	.readReg1(instr[19:15]),
-	.readReg2(instr[24:20]),
-	.writeReg(instr[11:7]),
+	.readReg1(instr[`IR_rs1]),
+	.readReg2(instr[`IR_rs2]),
+	.writeReg(instr[`IR_rd]),
 	.writeData(wb_data),
 	.regWrite(regwrite),
 	.readData1(data1),
@@ -85,7 +86,7 @@ mux2x1 #(32) pc_mux(.a(pc_add_four), .b(pc_shifted_flow), .sel(arewebranching), 
 // alu control unit selections
 ALUControlUnit alu_control(
     .ALUOp(aluop),
-	.Inst_14_12(instr[14:12]),
+	.funct3(instr[`IR_funct3]),
 	.Inst_30(instr[30]),
 	.ALU_Selection(alu_selected)
 	);
@@ -93,7 +94,7 @@ ALUControlUnit alu_control(
 prv32_ALU alu(
 	.a(data1),
 	.b(used),
-	.shamt(), // TODO: connect shift amount if needed
+	.shamt(instr[`IR_shamt]),
 	.r(alu_result),
 	.cf(cf),
 	.zf(zf),

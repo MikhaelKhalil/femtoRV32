@@ -2,7 +2,7 @@
 
 module ALUControlUnit (
 	input [1:0] ALUOp,
-	input [2:0] Inst_14_12,
+	input [2:0] funct3,
 	input Inst_30,
 	output reg [3:0] ALU_Selection
     );
@@ -10,18 +10,35 @@ module ALUControlUnit (
 always @(*) begin
 	case (ALUOp)
 		2'b00: begin // Load/Store instructions
-			ALU_Selection = 4'b0010; // ADD
+			ALU_Selection = 4'b00_00; // ADD
 		end
 		2'b01: begin // Branch instructions
-			ALU_Selection = 4'b0110; // SUB
+			case (funct3)
+				3'b000: ALU_Selection = `ALU_SUB; // BEQ => SUB
+				3'b001: ALU_Selection = `ALU_; // BNE => 
+			endcase
 		end
 		2'b10: begin // R-format instructions
-			case ({Inst_30, Inst_14_12})
-				4'b0000: ALU_Selection = 4'b0010; // ADD
-				4'b1000: ALU_Selection = 4'b0110; // SUB
-				4'b0111: ALU_Selection = 4'b0000; // AND
-				4'b0110: ALU_Selection = 4'b0001; // OR
-				default: ALU_Selection = 4'b0000; // Default to AND
+			case ({Inst_30, funct3})
+				4'b0_000: ALU_Selection = `ALU_ADD; // ADD
+				4'b1_000: ALU_Selection = `ALU_SUB; // SUB
+
+				4'b0_001: ALU_Selection = `ALU_SLL; // SLL
+
+				4'b0_010: ALU_Selection = `ALU_SLT; // SLT
+
+				4'b0_011: ALU_Selection = `ALU_SLTU; // SLTU
+
+				4'b0_100: ALU_Selection = `ALU_XOR; // XOR
+
+				4'b0_101: ALU_Selection = `ALU_SRL; // SRL
+				4'b1_101: ALU_Selection = `ALU_SRA; // SRA
+
+				4'b0_110: ALU_Selection = `ALU_OR; // OR
+
+				4'b0_111: ALU_Selection = `ALU_AND; // AND
+				
+				default: ALU_Selection = `ALU_PASS; // Default to PASS
 			endcase
 		end
 		default: begin
