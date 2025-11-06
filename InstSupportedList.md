@@ -1,0 +1,42 @@
+- [ ] LUI
+- [ ] AUIPC
+- [ ] JAL
+- [ ] JALR
+- [x] BEQ
+- [ ] BNE
+- [ ] BLT
+- [ ] BGE
+- [ ] BLTU
+- [ ] BGEU
+- [ ] LB
+- [ ] LH
+- [x] LW
+- [ ] LBU
+- [ ] LHU
+- [ ] SB
+- [ ] SH
+- [x] SW
+- [ ] ADDI
+- [ ] SLTI
+- [ ] SLTIU
+- [ ] XORI
+- [ ] ORI
+- [ ] ANDI
+- [ ] SLLI
+- [ ] SRLI
+- [ ] SRAI
+- [x] ADD
+- [x] SUB
+- [ ] SLL
+- [ ] SLT
+- [ ] SLTU
+- [ ] XOR
+- [ ] SRL
+- [ ] SRA
+- [x] OR
+- [x] AND
+- [ ] FENCE
+- [ ] FENCE.TSO
+- [ ] PAUSE
+- [ ] ECALL
+- [ ] EBREAK
