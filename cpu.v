@@ -43,9 +43,14 @@ Mem memory (
     );
 
 // TODO:
+wire jalr, jump, branchnotzero;
 /* Combinational => no need to define clock behavior */
 ControlUnit control(
-    .Inst(instr[`IR_opcode]),
+    .Opcode(instr[`IR_opcode]),
+	.Funct3(instr[`Funct3]),
+	.Jalr(jalr),
+	.Jump(jump),
+	.BranchNotZero(branchnotzero),
 	.BranchZero(branch),
 	.MemRead(memread),
 	.MemtoReg(memtoreg),
@@ -114,6 +119,18 @@ ALU #(32) alu(
 	.result(alu_result),
 	.zf(zf)
 	);
+
+// jump control unit
+wire shouldjump;
+// TODO: remove the arewebranching wire
+JumpControl jumpcontrol(
+    .jumpSignal(jump),
+    .branchSignal(branch),
+	.funct3(instr[`IR_funct3])
+    .zf(zf),
+    .slt(alu_result[0]),
+    .shouldJump(shouldjump)
+);
 
 // write back
 mux2x1 #(32) select_wb (.a(alu_result), .b(mem_data), .sel(memtoreg), .out(wb_data));

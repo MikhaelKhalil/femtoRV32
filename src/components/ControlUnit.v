@@ -1,11 +1,11 @@
 `timescale 1ns / 1ps
 
 module ControlUnit (
-	input [6:2] Inst,
+	input [6:2] Opcode,
+	input [`IR_funct3] Funct3,
 	output reg Jalr,
 	output reg Jump,
-	output reg BranchNotZero,
-	output reg BranchZero,
+	output reg Branch,
 	output reg MemRead,
 	output reg MemtoReg,
 	output reg [1:0] ALUOp,
@@ -14,25 +14,25 @@ module ControlUnit (
 	output reg RegWrite
     );
 
+// TODO: change MemToReg to serve AUIPC
+
 always @(*) begin
-	case (Inst)
-		5'b11_000: begin // OPCODE_BranchZero
-			Jalr = 1'bx; // TODO: 
-			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b1;
+	case (Opcode)
+		5'b11_000: begin // OPCODE_Branch
+			Jalr = 1'b0;
+			Jump = 1'b0;
+			Branch = 1'b1;
 			MemRead = 1'b0;
-			MemtoReg = 1'bx;
+			MemtoReg = 1'b0;
 			ALUOp = 2'b01;
 			MemWrite = 1'b0;
 			ALUSrc = 1'b0;
 			RegWrite = 1'b0;
 		end
 		5'b00_000: begin // OPCODE_Load
-			Jalr = 1'bx; // TODO: 
-			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b0;
+			Jalr = 1'b0;
+			Jump = 1'b0;
+			Branch = 1'b0;
 			MemRead = 1'b1;
 			MemtoReg = 1'b1;
 			ALUOp = 2'b00;
@@ -41,10 +41,9 @@ always @(*) begin
 			RegWrite = 1'b1;
 		end
 		5'b01_000: begin // OPCODE_Store
-			Jalr = 1'bx; // TODO: 
-			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b0;
+			Jalr = 1'b0;
+			Jump = 1'b0;
+			Branch = 1'b0;
 			MemRead = 1'b0;
 			MemtoReg = 1'bx;
 			ALUOp = 2'b00;
@@ -52,47 +51,43 @@ always @(*) begin
 			ALUSrc = 1'b1;
 			RegWrite = 1'b0;
 		end
-		5'b11_001: begin // OPCODE_JALR TODO:
-			Jalr = 1'bx; // TODO: 
-			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b0;
+		5'b11_001: begin // OPCODE_JALR
+			Jalr = 1'b1;
+			Jump = 1'b1;
+			Branch = 1'b0;
 			MemRead = 1'b0;
-			MemtoReg = 1'b0;
+			MemtoReg = 1'b0; // TODO: neither 0 nor 1, should be the output of the PC + offset adder
+			ALUOp = 2'b00;
+			MemWrite = 1'b0;
+			ALUSrc = 1'b0;
+			RegWrite = 1'b1;
+		end
+		5'b11_011: begin // OPCODE_JAL
+			Jalr = 1'b0;
+			Jump = 1'b1;
+			Branch = 1'b0;
+			MemRead = 1'b0;
+			MemtoReg = 1'bx;
 			ALUOp = 2'b00;
 			MemWrite = 1'b0;
 			ALUSrc = 1'b0;
 			RegWrite = 1'b0;
 		end
-		5'b11_011: begin // OPCODE_JAL TODO:
-			Jalr = 1'bx; // TODO: 
-			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b0;
+		5'b00_100: begin // OPCODE_Arith_I
+			Jalr = 1'b0;
+			Jump = 1'b0;
+			Branch = 1'b0;
 			MemRead = 1'b0;
 			MemtoReg = 1'b0;
-			ALUOp = 2'b00;
+			ALUOp = 2'b10;
 			MemWrite = 1'b0;
-			ALUSrc = 1'b0;
-			RegWrite = 1'b0;
-		end
-		5'b00_100: begin // OPCODE_Arith_I TODO:
-			Jalr = 1'bx; // TODO: 
-			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b0;
-			MemRead = 1'b0;
-			MemtoReg = 1'b0;
-			ALUOp = 2'b00;
-			MemWrite = 1'b0;
-			ALUSrc = 1'b0;
-			RegWrite = 1'b0;
+			ALUSrc = 1'b1;
+			RegWrite = 1'b1;
 		end
 		5'b01_100: begin // OPCODE_Arith_R
-			Jalr = 1'bx; // TODO: 
-			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b0;
+			Jalr = 1'b0;
+			Jump = 1'b0;
+			Branch = 1'b0;
 			MemRead = 1'b0;
 			MemtoReg = 1'b0;
 			ALUOp = 2'b10;
@@ -100,35 +95,32 @@ always @(*) begin
 			ALUSrc = 1'b0;
 			RegWrite = 1'b1;
 		end
-		5'b00_101: begin // OPCODE_AUIPC TODO:
-			Jalr = 1'bx; // TODO: 
-			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b0;
+		5'b00_101: begin // OPCODE_AUIPC
+			Jalr = 1'b0;
+			Jump = 1'b0;
+			Branch = 1'b0;
 			MemRead = 1'b0;
-			MemtoReg = 1'b0;
-			ALUOp = 2'b10;
+			MemtoReg = 1'b0; // TODO: should add a mux in front of alusrc1 to select between readdata1 and the PC
+			ALUOp = 2'b00;
 			MemWrite = 1'b0;
-			ALUSrc = 1'b0;
+			ALUSrc = 1'b1;
 			RegWrite = 1'b1;
 		end
-		5'b01_101: begin // OPCODE_LUI TODO:
-			Jalr = 1'bx; // TODO: 
-			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b0;
+		5'b01_101: begin // OPCODE_LUI
+			Jalr = 1'b0;
+			Jump = 1'b0;
+			Branch = 1'b0;
 			MemRead = 1'b0;
 			MemtoReg = 1'b0;
 			ALUOp = 2'b10;
 			MemWrite = 1'b0;
-			ALUSrc = 1'b0;
+			ALUSrc = 1'b1;
 			RegWrite = 1'b1;
 		end
 		5'b11_100: begin // OPCODE_SYSTEM TODO:
 			Jalr = 1'bx; // TODO: 
 			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b0;
+			Branch = 1'b0;
 			MemRead = 1'b0;
 			MemtoReg = 1'b0;
 			ALUOp = 2'b10;
@@ -139,8 +131,7 @@ always @(*) begin
 		5'b10_001: begin // OPCODE_Custom TODO:
 			Jalr = 1'bx; // TODO: 
 			Jump = 1'bx; // TODO: 
-			BranchNotZero = 1'bx; // TODO: 
-			BranchZero = 1'b0;
+			Branch = 1'b0;
 			MemRead = 1'b0;
 			MemtoReg = 1'b0;
 			ALUOp = 2'b10;
