@@ -29,18 +29,32 @@ assign control_signals = {2'b00, aluop, alu_selected, cf, zf, vf, sf, arewebranc
 nbit_reg #(32) pc(.load(1'b1), .clk(clk), .rst(rst), .data(next_pc), .q(current_pc)); 
 
 /*	IF => reading is combinational no need to define clock behavior
-	Mem => (in case of reading) => posedge clk */
-// According to MemRead of the control unit, we will decide the source of the address to read from
-wire [6:0] read_address;
-assign read_address = memread ? alu_result[6:0] : current_pc[6:0];
-Mem memory (
+	Instruction Memory => combinational read
+	Data Memory => (in case of reading) => combinational, (writing) => posedge clk */
+
+// Instruction Memory - Read-only, addressed by PC
+// PC is byte-addressed, convert to word address: PC[8:2]
+wire [6:0] instr_addr;
+assign instr_addr = current_pc[8:2];  // Word address (divide by 4)
+instr_mem imem(
+    .addr(instr_addr),
+    .instruction(instr)
+);
+
+// Data Memory - Read-write, addressed by ALU result
+// ALU result is byte-addressed, pass full byte address (9 bits: 8:0)
+// This allows proper byte/halfword addressing within words
+wire [8:0] data_byte_addr;
+assign data_byte_addr = alu_result[8:0];  // Byte address (9 bits)
+data_mem dmem(
     .clk(clk),
     .MemRead(memread),
     .MemWrite(memwrite),
-    .addr(read_address),
+    .funct3(instr[`IR_funct3]),  // For load/store size (byte/halfword/word)
+    .byte_addr(data_byte_addr),
     .data_in(data2),
     .data_out(mem_data)
-    );
+);
 
 // TODO:
 wire jalr, jump, branchnotzero;
