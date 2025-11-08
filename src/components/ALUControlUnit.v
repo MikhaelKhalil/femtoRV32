@@ -12,12 +12,8 @@ always @(*) begin
 		2'b00: begin // Load/Store & Jump instructions
 			ALU_Selection = 4'b00_00; // ADD
 		end
-		2'b01: begin // Branch instructions
-			case (funct3)
-				3'b000: ALU_Selection = `ALU_SUB; // BEQ => SUB
-				3'b001: ALU_Selection = `ALU_SUB; // BNE => SUB
-				3'b100: ALU_Selection = `ALU_SLT; // BNE => SLT
-			endcase
+		2'b01: begin // Branch instructions: all use SUB, flags determine branch condition
+			ALU_Selection = `ALU_SUB; 
 		end
 		2'b10: begin // R-format instructions
 			case ({Inst_30, funct3})

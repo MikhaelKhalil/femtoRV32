@@ -8,11 +8,11 @@
 - [ ] JAL
 - [ ] JALR
 - [x] BEQ
-- [ ] BNE
-- [ ] BLT
-- [ ] BGE
-- [ ] BLTU
-- [ ] BGEU
+- [x] BNE
+- [x] BLT
+- [x] BGE
+- [x] BLTU
+- [x] BGEU
 - [ ] LB
 - [ ] LH
 - [x] LW
