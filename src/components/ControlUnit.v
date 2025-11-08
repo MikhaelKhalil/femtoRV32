@@ -103,7 +103,7 @@ always @(*) begin
 			Branch = 1'b0;
 			MemRead = 1'b0;
 			MemtoReg = 1'b0;
-			ALUOp = 2'b10;
+			ALUOp = 2'b11;
 			MemWrite = 1'b0;
 			ALUSrc = 1'b1;
 			RegWrite = 1'b1;
