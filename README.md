@@ -13,31 +13,31 @@
 - [x] BGE
 - [x] BLTU
 - [x] BGEU
-- [ ] LB
-- [ ] LH
+- [x] LB
+- [x] LH
 - [x] LW
-- [ ] LBU
-- [ ] LHU
-- [ ] SB
-- [ ] SH
+- [x] LBU
+- [x] LHU
+- [x] SB
+- [x] SH
 - [x] SW
-- [ ] ADDI
-- [ ] SLTI
-- [ ] SLTIU
-- [ ] XORI
-- [ ] ORI
-- [ ] ANDI
-- [ ] SLLI
-- [ ] SRLI
-- [ ] SRAI
+- [x] ADDI
+- [x] SLTI
+- [x] SLTIU
+- [x] XORI
+- [x] ORI
+- [x] ANDI
+- [x] SLLI
+- [x] SRLI
+- [x] SRAI
 - [x] ADD
 - [x] SUB
-- [ ] SLL
-- [ ] SLT
-- [ ] SLTU
-- [ ] XOR
-- [ ] SRL
-- [ ] SRA
+- [x] SLL
+- [x] SLT
+- [x] SLTU
+- [x] XOR
+- [x] SRL
+- [x] SRA
 - [x] OR
 - [x] AND
 - [ ] FENCE
