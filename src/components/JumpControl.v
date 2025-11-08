@@ -16,7 +16,7 @@ module JumpControl(
                 3'b001: shouldJump = zf == 0;   // BNE
                 3'b100: shouldJump = zf == 0 && slt == 1;  // BLT
                 3'b101: shouldJump = zf == 0 && slt == 0;  // BGE
-                3'b101: shouldJump = zf == 0 && slt == 1;  // BLTU
+                3'b110: shouldJump = zf == 0 && slt == 1;  // BLTU 
                 3'b111: shouldJump = zf == 0 && slt == 0;  // BGEU
             endcase
         end else if (jumpSignal) shouldJump = 1;
