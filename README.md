@@ -3,10 +3,10 @@
 
 ### Supported Instructions List
 
-- [ ] LUI
-- [ ] AUIPC
-- [ ] JAL
-- [ ] JALR
+- [x] LUI
+- [x] AUIPC
+- [x] JAL
+- [x] JALR
 - [x] BEQ
 - [x] BNE
 - [x] BLT
@@ -40,8 +40,8 @@
 - [x] SRA
 - [x] OR
 - [x] AND
-- [ ] FENCE
-- [ ] FENCE.TSO
-- [ ] PAUSE
-- [ ] ECALL
-- [ ] EBREAK
+- [x] FENCE
+- [x] FENCE.TSO
+- [x] PAUSE
+- [x] ECALL
+- [x] EBREAK

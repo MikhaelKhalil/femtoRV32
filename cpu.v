@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+`include "src/defines.v"
+
 module cpu(
     input clk, rst
 );
@@ -93,12 +95,12 @@ RegFile registers(
 );
 
 /* Combinational => no need to define clock behavior */
-immgen immediate(.gen_out(imm), .inst(instr));
+rv32_ImmGen immediate(.IR(instr), .Imm(imm));
 
 // PC calculations
 assign pc_add_four = current_pc + 32'd4;
-shiftleft #(32) shift(.a(imm), .out(imm_shifted));
-assign pc_branch_target = current_pc + imm_shifted;  // For branches/JAL (imm already shifted)
+// Note: rv32_ImmGen already shifts branch/JAL immediates (LSB=0), so use imm directly
+assign pc_branch_target = current_pc + imm;  // For branches/JAL (imm already shifted by rv32_ImmGen)
 // For JALR: rs1 + imm, then clear LSB (RISC-V spec)
 wire [31:0] jalr_temp;
 assign jalr_temp = data1 + imm;
