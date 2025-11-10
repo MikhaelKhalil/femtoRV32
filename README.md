@@ -35,7 +35,7 @@
 - [x] SLL
 - [x] SLT
 - [x] SLTU
-- [5] XOR
+- [x] XOR
 - [x] SRL
 - [x] SRA [needs more testing]
 - [x] OR
