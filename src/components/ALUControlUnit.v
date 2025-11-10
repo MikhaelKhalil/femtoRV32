@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+`include "defines.v"
 
 module ALUControlUnit (
 	input [1:0] ALUOp,
@@ -38,22 +39,8 @@ always @(*) begin
 				default: ALU_Selection = `ALU_PASS; // Default to PASS
 			endcase
 		end
-		2'b11: begin // I-format instructions
-			case ({Inst_30, funct3})
-				4'b0_000: ALU_Selection = `ALU_ADD; // ADDI
-				4'b0_001: ALU_Selection = `ALU_SLL; // SLLI
-				4'b0_010: ALU_Selection = `ALU_SLT; // SLTI
-				4'b0_011: ALU_Selection = `ALU_SLTU; // SLTIU
-				4'b0_100: ALU_Selection = `ALU_XOR; // XORI
-				4'b0_101: ALU_Selection = `ALU_SRL; // SRLI
-				4'b1_101: ALU_Selection = `ALU_SRA; // SRAI
-				4'b0_110: ALU_Selection = `ALU_OR; // ORI
-				4'b0_111: ALU_Selection = `ALU_AND; // ANDI
-				default: ALU_Selection = `ALU_ADD; // Default to ADD
-			endcase
-		end
 		default: begin
-			ALU_Selection = 4'b0000; // Default to AND
+			ALU_Selection = `ALU_PASS; // Default to PASS
 		end
 	endcase
 end
