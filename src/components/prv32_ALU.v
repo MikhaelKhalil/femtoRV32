@@ -34,8 +34,8 @@ module prv32_ALU(
             4'b01_11:  r = a ^ b;   // ALU_XOR
             // shift
             4'b10_00:  r=sh;    // ALU_SRL
-            4'b10_01:  r=sh;    // ALU_SRA
-            4'b10_10:  r=sh;    // ALU_SLL
+            4'b10_10:  r=sh;    // ALU_SRA
+            4'b10_01:  r=sh;    // ALU_SLL
             // slt & sltu
             4'b11_01:  r = {31'b0,(sf != vf)};        // ALU_SLT
             4'b11_11:  r = {31'b0,(~cf)};   // ALU_SLTU

@@ -174,7 +174,7 @@ always @(*) begin
 			AUIPC_Sel = 1'b0;      // Use rs1 (default)
 			endProgram = 1'b0;
 		end
-		default: begin // Default to NOP
+		default: begin // Default to exception
 			Jalr = 1'b0;
 			Jump = 1'b0;
 			Branch = 1'b0;
@@ -183,7 +183,7 @@ always @(*) begin
 			MemWrite = 1'b0;
 			ALUSrc = 1'b0;
 			RegWrite = 1'b0;
-			PC_Sel = 2'b00;        // PC+4
+			PC_Sel = 2'b11;        // PC+4
 			writeData_Sel = 2'b00; // ALU (not used, RegWrite=0)
 			AUIPC_Sel = 1'b0;      // Use rs1 (default)
 			endProgram = 1'b0;

@@ -29,15 +29,15 @@
 - [x] ANDI
 - [x] SLLI
 - [x] SRLI
-- [x] SRAI
+- [x] SRAI [needs more testing]
 - [x] ADD
 - [x] SUB
 - [x] SLL
 - [x] SLT
 - [x] SLTU
-- [x] XOR
+- [5] XOR
 - [x] SRL
-- [x] SRA
+- [x] SRA [needs more testing]
 - [x] OR
 - [x] AND
 - [x] FENCE
