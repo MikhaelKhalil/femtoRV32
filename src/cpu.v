@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps
-`include "defines.v"
+`include "../defines.v"
 
 module cpu(
     input clk, rst
@@ -113,8 +113,10 @@ JumpControl jumpcontrol(
     .jumpSignal(jump | jalr),
     .branchSignal(branch),
 	.funct3(instr[`IR_funct3]),
-    .zf(zf),
-    .slt(alu_result[0]),
+    .cf(cf),
+	.zf(zf),
+	.vf(vf),
+	.sf(sf),
     .shouldJump(shouldjump)
 );
 

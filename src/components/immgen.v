@@ -1,4 +1,4 @@
-`include "defines.v"
+`include "../../defines.v"
 
 module rv32_ImmGen (
     input  wire [31:0]  IR,

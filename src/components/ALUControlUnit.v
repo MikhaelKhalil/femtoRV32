@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps
-`include "defines.v"
+`include "../../defines.v"
 
 module ALUControlUnit (
 	input [1:0] ALUOp,
