@@ -1,5 +1,6 @@
 # femtoRV32
 
+## Milestone 1 - Single Cycle Implementation (Full RISC-V ISA Support)
 
 ### Supported Instructions List
 
@@ -40,8 +41,19 @@
 - [x] SRA [needs more testing]
 - [x] OR
 - [x] AND
-- [x] FENCE
-- [x] FENCE.TSO
-- [x] PAUSE
-- [x] ECALL
-- [x] EBREAK
+- [x] \* FENCE
+- [x] \* FENCE.TSO
+- [x] \* PAUSE
+- [x] \* ECALL
+- [x] \* EBREAK
+
+\* all of these instructions are implemented as a halting behaviour where the PC doesn't get updated anymore.
+
+## Milestone 2 - Pipelined with Full-Forwarding Implementation (Full RISC-V ISA Support)
+
+#### TODOs
+- [x] Pipeline Registers
+- [ ] Forwarding Unit
+- [ ] Hazard Detection Unit
+- [ ] Combined Instruction & Data Memory
+- [ ] Issuing an instruction every 2 cycles to avoid structural hazards.
