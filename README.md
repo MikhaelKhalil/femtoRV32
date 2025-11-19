@@ -53,7 +53,7 @@
 
 #### TODOs
 - [x] Pipeline Registers
-- [ ] Forwarding Unit
-- [ ] Hazard Detection Unit
+- [x] Forwarding Unit
+- [x] Hazard Detection Unit
 - [ ] Combined Instruction & Data Memory
 - [ ] Issuing an instruction every 2 cycles to avoid structural hazards.
