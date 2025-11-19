@@ -20,18 +20,30 @@ module cpu(
     // 1) Provide a NOP instruction to the IF/ID register instead of the upcoming instruction
     // 2) Replace Control Signals in the ID stage with zeros
     // 3) Replace the MEM & WB Signals going to the EX/MEM register with zeros
+    
+    /* Stalling in case of a Structural Hazard */
+    // If EX/MEM.MemRead == 1 or EX/MEM.MemWrite == 1,
+    // 1) Keep the PC unchanged for the next cycle
+    // 2) Provide a NOP instruction to the IF/ID register instead of the instruction to be stalled
+    // NOTE: This type of stalling is different from that issued by the Hazard Detection Unit, because in this type we let the rest of the pipeline to work freely except for the new instruction being fetched.
+    wire structural_hazard_stall;
+    structural_hazard_stall = ex_mem_mem_signals[0] /* EX/MEM.MemRead */ | ex_mem_mem_signals[1] /* EX/MEM.MemWrite */;
+    
     wire [31:0] instr_to_use;
-    assign instr_to_use = shouldJump ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
+    assign instr_to_use = (shouldJump | structural_hazard_stall) ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
     
     /* START: STAGE 1 - IF */
-    /*	IF => reading is combinational no need to define clock behavior
-        Mem => (in case of reading) => posedge clk */
     wire [31:0] current_pc, next_pc;
-    nbit_reg #(32) pc(.load(!stall), .clk(clk), .rst(rst), .data(next_pc), .q(current_pc)); 
+    nbit_reg #(32) pc(
+        .load(!stall && !structural_hazard_stall),
+        .clk(clk),
+        .rst(rst),
+        .data(next_pc),
+        .q(current_pc)
+    );
     
-    // TODO: In order to combine the memories, according to VALUE of the clk, we will decide the source of the address to read from
+    // Mem module instantiated below with the MEM stage below
     wire [31:0] instr;
-    InstMem instruction_mem (.addr(current_pc[7:0]), .data_out(instr));
     /* END: STAGE 1 - IF */
 
     /* IF/ID Register */
@@ -41,11 +53,10 @@ module cpu(
         .load(!stall),
         .clk(clk),
         .rst(rst),
-        .data({ current_pc, instr_to_use}), // instr_to_use instead of instr for instruction flushing
+        .data({ current_pc, instr_to_use}), // instr_to_use instead of instr for instruction flushing and structural hazard handling
         .q({    if_id_pc,   if_id_instr}));
 
     /* START: STAGE 2 - ID */
-    /* Combinational => no need to define clock behavior */
     wire jalr, jump, branch, memread, memwrite, alusrc, regwrite;
     wire [1:0] aluop, PC_Sel, writeData_Sel;
     wire AUIPC_Sel, endProgram;
@@ -72,8 +83,7 @@ module cpu(
     // and Instruction Flushing                         => shouldJump signal (because the currently used branch predictor is an implicit always-not-taken predictor)
     assign {jalr, jump, branch, memread, aluop [1:0], memwrite, alusrc, regwrite, PC_Sel [1:0], writeData_Sel [1:0], AUIPC_Sel, endProgram} = (stall | shouldJump) ? 8'b0 : control_unit_outputs;
     
-    /*	ID => combinational => no need to define clock behavior
-        WB => posedge clk */
+    /* WB => negedge clk */
     wire [31:0] data1, data2;
     wire [31:0] wb_data;
     RegFile registers(
@@ -88,7 +98,6 @@ module cpu(
         .readData2(data2)
     );
     
-    /* Combinational => no need to define clock behavior */
     wire [31:0] imm;
     rv32_ImmGen immediate(
         .IR(if_id_instr),
@@ -128,7 +137,7 @@ module cpu(
         .forwardB(forwardB)
     );
 
-    wire [31:0] operand1_layer1, operand1;
+    reg [31:0] operand1_layer1, operand1;
     wire [31:0] operand2_layer1, operand2;
     wire [31:0] alu_shamt;
     // First layer of Muxes (Big Muxes)
@@ -155,7 +164,6 @@ module cpu(
     wire [31:0] pc_shifted_flow;
     assign pc_shifted_flow = id_ex_pc + id_ex_imm;
     
-    /* EX => Combinational: no need to define clock behavior */
     wire [3:0] alu_function;
     ALUControlUnit alu_control(
         .ALUOp(id_ex_exc_signals[1:0]),
@@ -221,12 +229,15 @@ module cpu(
     mux4x1 #(32) pcmux2(.a(temppc), .b(temppc), .c(ex_mem_alu_result), .d(current_pc), .sel(ex_mem_mem_signals[4:3] /* PC_Sel */), .out(next_pc));
 
     wire [31:0] mem_data;
-    DataMem data_mem(
+    
+    wire [31:0] addr_to_use;
+    assign addr_to_use = structural_hazard_stall /* i.e., reading/writing to data memory */ ? ex_mem_alu_result[7:0] : current_pc[7:0];
+    Mem memory(
         .clk(clk),
         .MemRead(ex_mem_mem_signals[0]),
         .MemWrite(ex_mem_mem_signals[1]),
-        .funct3(ex_mem_instr_funct3),
-        .addr(ex_mem_alu_result[7:0]),
+        .funct3(ex_mem_instr_funct3),       // TODO: check if this is the correct method to differentiate between LW, LH, LB
+        .addr(addr_to_use),
         .data_in(ex_mem_d2),
         .data_out(mem_data)
     );

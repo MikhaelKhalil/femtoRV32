@@ -51,9 +51,11 @@
 
 ## Milestone 2 - Pipelined with Full-Forwarding Implementation (Full RISC-V ISA Support)
 
-#### TODOs
+#### Pipelined Implementation
 - [x] Pipeline Registers
 - [x] Forwarding Unit
 - [x] Hazard Detection Unit
-- [ ] Combined Instruction & Data Memory
-- [ ] Issuing an instruction every 2 cycles to avoid structural hazards.
+- [x] Byte-addressable memory
+- [x] Combined Instruction & Data Memory
+- [ ] ~Issuing an instruction every 2 cycles to avoid structural hazards.~
+- [x] Handle Structural Hazards by stalling fetching a new instruction for one cycle when there is a data memory read or write.
