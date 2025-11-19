@@ -1,0 +1,108 @@
+{
+  "R_TYPE": {
+    "add":  {"opcode": "0110011",  "funct3": "000",  "funct7": "0000000"},
+
+    "sub":  {"opcode": "0110011",  "funct3": "000",  "funct7": "0100000"},
+
+    "sll":  {"opcode": "0110011",  "funct3": "001",  "funct7": "0000000"},
+
+    "slt":  {"opcode": "0110011",  "funct3": "010",  "funct7": "0000000"},
+
+    "sltu": {"opcode": "0110011",  "funct3": "011",  "funct7": "0000000"},
+
+    "xor":  {"opcode": "0110011",  "funct3": "100",  "funct7": "0000000"},
+
+    "srl":  {"opcode": "0110011",  "funct3": "101",  "funct7": "0000000"},
+
+    "sra":  {"opcode": "0110011",  "funct3": "101",  "funct7": "0100000"},
+
+    "or":   {"opcode": "0110011",  "funct3": "110",  "funct7": "0000000"},
+
+    "and":  {"opcode": "0110011",  "funct3": "111",  "funct7": "0000000"}
+  },
+
+
+    "I_TYPE": {
+    "addi": {"opcode": "0010011",  "funct3": "000",  "imm_bits": [[11, 0]]},
+
+    "slti": {"opcode": "0010011",  "funct3": "010",  "imm_bits": [[11, 0]]},
+
+    "sltiu":{"opcode": "0010011",  "funct3": "011",  "imm_bits": [[11, 0]]},
+
+    "xori": {"opcode": "0010011",  "funct3": "100",  "imm_bits": [[11, 0]]},
+
+    "ori":  {"opcode": "0010011",  "funct3": "110",  "imm_bits": [[11, 0]]},
+
+    "andi": {"opcode": "0010011",  "funct3": "111",  "imm_bits": [[11, 0]]},
+
+    "slli": {"opcode": "0010011",  "funct3": "001","  funct7": "0000000",  "imm_bits": [[24, 20]]},
+
+    "srli": {"opcode": "0010011",  "funct3": "101","  funct7": "0000000",  "imm_bits": [[24, 20]]},
+
+    "srai": {"opcode": "0010011",  "funct3": "101","  funct7": "0100000",  "imm_bits": [[24, 20]]},
+
+
+
+    "jalr": {"opcode": "1100111",  "funct3": "000",  "imm_bits": [[11, 0]]},
+
+
+    "lb":   {"opcode": "0000011",  "funct3": "000",  "imm_bits": [[11, 0]]},
+
+    "lh":   {"opcode": "0000011",  "funct3": "001",  "imm_bits": [[11, 0]]},
+
+    "lw":   {"opcode": "0000011",  "funct3": "010",  "imm_bits": [[11, 0]]},
+
+    "lbu":  {"opcode": "0000011",  "funct3": "100",  "imm_bits": [[11, 0]]},
+
+    "lhu":  {"opcode": "0000011",  "funct3": "101",  "imm_bits": [[11, 0]]}
+  },
+
+
+  "S_TYPE": {
+    "sb":   {"opcode": "0100011", "funct3": "000","imm_bits": [[11,5], [4, 0]]},
+
+    "sh":   {"opcode": "0100011", "funct3": "001","imm_bits": [[11,5], [4, 0]]},
+
+    "sw":   {"opcode": "0100011", "funct3": "010","imm_bits": [[11,5], [4, 0]]}
+  },
+
+
+    "B_TYPE": {
+    "beq":  {"opcode": "1100011", "funct3": "000","imm_bits": [[12, 12], [10, 5], [4, 1], [11, 11]]},
+
+    "bne":  {"opcode": "1100011", "funct3": "001","imm_bits": [[12, 12], [10, 5], [4, 1], [11, 11]]},
+
+    "blt":  {"opcode": "1100011", "funct3": "100","imm_bits": [[12, 12], [10, 5], [4, 1], [11, 11]]},
+
+    "bge":  {"opcode": "1100011", "funct3": "101","imm_bits": [[12, 12], [10, 5], [4, 1], [11, 11]]},
+
+    "bltu": {"opcode": "1100011", "funct3": "110","imm_bits": [[12, 12], [10, 5], [4, 1], [11, 11]]},
+
+    "bgeu": {"opcode": "1100011", "funct3": "111","imm_bits": [[12, 12], [10, 5], [4, 1], [11, 11]]}
+  },
+
+
+    "U_TYPE": {
+    "lui":   {"opcode": "0110111","imm_bits": [[31, 12]]},
+
+    "auipc": {"opcode": "0010111","imm_bits": [[31, 12]]}
+  },
+
+
+    "J_TYPE": {
+    "jal": {"opcode": "1101111","imm_bits": [[20, 20], [10, 1], [11, 11], [19, 12]]}
+  },
+
+
+    "SYSTEM": {
+    "fence": {"opcode": "0001111"},
+
+    "fence.tso": {"opcode": "0001111"},
+
+    "pause": {"opcode": "0001111"},
+
+    "ecall": {"opcode": "1110011"},
+
+    "ebreak": {"opcode": "1110011"}
+  }
+}
