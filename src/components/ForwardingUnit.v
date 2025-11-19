@@ -8,13 +8,13 @@ module ForwardingUnit(
     output reg [1:0] forwardA, forwardB
 );
     always @(*) begin
-        if(ex_mem_regwrite && (ex_mem_rd != 5'b0) && (ex_mem_rd == id_ex_rs1)) forwardA = 2'b10;
-        else if(mem_wb_regwrite && (mem_wb_rd != 5'b0) && (mem_wb_rd == id_ex_rs1)) forwardA = 2'b01;
-        else forwardA = 2'b00; 
+        if(ex_mem_regwrite && (ex_mem_rd != 5'b0) && (ex_mem_rd == id_ex_rs1)) forwardA = 2'b10;        // Forward from last EX
+        else if(mem_wb_regwrite && (mem_wb_rd != 5'b0) && (mem_wb_rd == id_ex_rs1)) forwardA = 2'b01;   // Forward from second-to-last MEM
+        else forwardA = 2'b00;                                                                          // Take the read value from the RegFile
         
-        if(ex_mem_regwrite && (ex_mem_rd != 5'b0) && (ex_mem_rd == id_ex_rs2)) forwardB = 2'b10;
-        else if(mem_wb_regwrite && (mem_wb_rd != 5'b0) && (mem_wb_rd == id_ex_rs2)) forwardB = 2'b01; 
-        else forwardB = 2'b00;    
+        if(ex_mem_regwrite && (ex_mem_rd != 5'b0) && (ex_mem_rd == id_ex_rs2)) forwardB = 2'b10;        // Forward from last EX
+        else if(mem_wb_regwrite && (mem_wb_rd != 5'b0) && (mem_wb_rd == id_ex_rs2)) forwardB = 2'b01;   // Forward from second-to-last MEM
+        else forwardB = 2'b00;                                                                          // Take the read value from the RegFile
     end
     
 endmodule
