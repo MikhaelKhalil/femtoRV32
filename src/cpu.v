@@ -4,37 +4,15 @@
 module cpu(
     input clk, rst
 );
-
-    wire [31:0] current_pc;
-    wire [31:0] next_pc;
-    wire [31:0] instr;
-    wire [31:0] data1, data2;
-    wire [31:0] wb_data;
-    wire [31:0] imm;
-    wire [31:0] operand1; 
-    wire [31:0] operand2;
-    wire [31:0] alu_shamt;
-    wire [31:0] alu_result;
-    wire [31:0] mem_data;
-    wire [31:0] pc_add_four;
-    wire [31:0] pc_shifted_flow;
-    wire [1:0] PC_Sel;
-    wire [1:0] writeData_Sel;
-    wire AUIPC_Sel;
-    wire endProgram;
-    
-    wire jalr, jump, branch, memread, memwrite, alusrc, regwrite;
-    wire [1:0] aluop;
-    wire [3:0] alu_function;
-    wire cf, zf, vf, sf;
-    wire shouldJump;
-    
     /* START: STAGE 1 - IF */
-    nbit_reg #(32) pc(.load(1'b1), .clk(clk), .rst(rst), .data(next_pc), .q(current_pc)); 
-
     /*	IF => reading is combinational no need to define clock behavior
         Mem => (in case of reading) => posedge clk */
+    wire [31:0] current_pc;
+    wire [31:0] next_pc;
+    nbit_reg #(32) pc(.load(1'b1), .clk(clk), .rst(rst), .data(next_pc), .q(current_pc)); 
+    
     // TODO: In order to combine the memories, according to VALUE of the clk, we will decide the source of the address to read from
+    wire [31:0] instr;
     InstMem instruction_mem (.addr(current_pc[7:0]), .data_out(instr));
     /* END: STAGE 1 - IF */
 
@@ -50,6 +28,9 @@ module cpu(
 
     /* START: STAGE 2 - ID */
     /* Combinational => no need to define clock behavior */
+    wire jalr, jump, branch, memread, memwrite, alusrc, regwrite;
+    wire [1:0] aluop, PC_Sel, writeData_Sel;
+    wire AUIPC_Sel, endProgram;
     ControlUnit control(
         .Opcode(if_id_instr[`IR_opcode]),
         .Funct3(if_id_instr[`IR_funct3]),
@@ -69,19 +50,22 @@ module cpu(
     
     /*	ID => combinational => no need to define clock behavior
         WB => posedge clk */
+    wire [31:0] data1, data2;
+    wire [31:0] wb_data;
     RegFile registers(
         .clk(clk),
         .rst(rst),
         .readReg1(if_id_instr[`IR_rs1]),
         .readReg2(if_id_instr[`IR_rs2]),
         .writeReg(if_id_instr[`IR_rd]),
-        .writeData(wb_data),
-        .regWrite(mem_wb_wb_signals[1]), // Belongs to the WB Stage
+        .writeData(wb_data),                // Belongs to the WB Stage
+        .regWrite(mem_wb_wb_signals[1]),    // Belongs to the WB Stage
         .readData1(data1),
         .readData2(data2)
         );
     
     /* Combinational => no need to define clock behavior */
+    wire [31:0] imm;
     rv32_ImmGen immediate(
         .IR(if_id_instr),
         .Imm(imm)
@@ -106,10 +90,11 @@ module cpu(
         );
 
     /* START: STAGE 3 - EX */
+    wire [31:0] pc_shifted_flow;
     assign pc_shifted_flow = id_ex_pc + id_ex_imm;
     
     /* EX => Combinational: no need to define clock behavior */
-    // alu control unit selections
+    wire [3:0] alu_function;
     ALUControlUnit alu_control(
         .ALUOp(id_ex_exc_signals[1:0]),
         .funct3(id_ex_instr_funct3),
@@ -118,10 +103,15 @@ module cpu(
         );
 
     // alu operands
+    wire [31:0] operand1; 
+    wire [31:0] operand2;
+    wire [31:0] alu_shamt;
     mux2x1 #(32) data1_pick(.a(id_ex_d1), .b(id_ex_pc), .sel(id_ex_exc_signals[3] /* AUIPC_Sel */), .out(operand1));
     mux2x1 #(32) data2_pick(.a(id_ex_d2), .b(id_ex_imm), .sel(id_ex_exc_signals[2] /* alusrc */), .out(operand2));
     mux2x1 #(32) shamt_pick(.a(id_ex_d2), .b(id_ex_instr_shamt), .sel(id_ex_exc_signals[2] /* alusrc */), .out(alu_shamt));
     
+    wire cf, zf, vf, sf;
+    wire [31:0] alu_result;
     prv32_ALU alu(
         .a(operand1),
         .b(operand2),
@@ -152,6 +142,7 @@ module cpu(
 
     /* START: STAGE 4 - MEM */
     // jump control unit -- decides if we should jump based on ALU flags
+    wire shouldJump;
     JumpControl jumpcontrol(
         .jumpSignal(ex_mem_mem_signals[6] /* jump */ | ex_mem_mem_signals[5] /* jalr */),
         .branchSignal(ex_mem_mem_signals[2] /* branch */),
@@ -163,11 +154,13 @@ module cpu(
         .shouldJump(shouldJump)
     );
 
-    wire [31:0] temppc;
+    wire [31:0] pc_add_four;
     assign pc_add_four = current_pc + 32'd4;
+    wire [31:0] temppc;
     mux2x1 #(32) pcmux1(.a(pc_add_four), .b(pc_shifted_flow), .sel(shouldJump), .out(temppc));
     mux4x1 #(32) pcmux2(.a(temppc), .b(temppc), .c(ex_mem_alu_result), .d(current_pc), .sel(ex_mem_mem_signals[4:3] /* PC_Sel */), .out(next_pc));
 
+    wire [31:0] mem_data;
     DataMem data_mem(
         .clk(clk),
         .MemRead(ex_mem_mem_signals[0]),
@@ -193,6 +186,7 @@ module cpu(
 
     /* START: STAGE 5 - WB */
     wire [31:0] wb_pc_add_four;
+    // FIXME: (works for now) recall the jal/jalr instructions and where their values come from because this is not the correct stage to place that adder
     assign wb_pc_add_four = mem_wb_pc + 32'b4;
 
     mux4x1 #(32) select_wb (.a(mem_wb_alu_result), .b(mem_wb_mem_data), .c(wb_pc_add_four), .d(32'bx), .sel(mem_wb_wb_signals[1:0]), .out(wb_data));

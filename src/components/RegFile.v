@@ -18,7 +18,8 @@ module RegFile (
 	assign readData2 = regFile[readReg2];
 
     integer i;
-	always @(posedge clk or posedge rst) begin
+	/* The WB Stage writes on the negedge of the clk so that we can WB and read (ID) from the same register in the same cycle (2 half cycles) */
+	always @(negedge clk or posedge rst) begin
 		if (rst) begin		
 			for (i = 0; i < 32; i = i + 1) begin
 				regFile[i] = 32'b0;
