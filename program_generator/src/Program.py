@@ -13,7 +13,8 @@ class Program:
             for i in range(IC): # IC is Instruction Count
                 instruction = self.generator.random_instruction(type)
                 self.instructions.append(instruction)
-                self._write_asm()
+            
+            self._write_asm()
 
         except Exception as e:
             print(f"Error Generating Program: {e}") 

@@ -3,6 +3,7 @@ from Generator import Generator
 from Program import Program
 import json
 import os
+import pprint
 
 def main():
 
@@ -12,11 +13,14 @@ def main():
     with open(json_path, "r") as f:
         encoding = json.load(f)
 
-        generator = Generator(encoding)
 
-        program = Program(generator)
+    pprint.pprint(encoding, width = 120)
 
-        program.generate()
+    generator = Generator(encoding)
+
+    program = Program(generator)
+
+    program.generate()
 
 
 

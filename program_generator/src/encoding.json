@@ -35,11 +35,11 @@
 
     "andi": {"opcode": "0010011",  "funct3": "111",  "imm_bits": [[11, 0]]},
 
-    "slli": {"opcode": "0010011",  "funct3": "001","  funct7": "0000000",  "imm_bits": [[24, 20]]},
+    "slli": {"opcode": "0010011",  "funct3": "001","funct7": "0000000",  "imm_bits": [[24, 20]]},
 
-    "srli": {"opcode": "0010011",  "funct3": "101","  funct7": "0000000",  "imm_bits": [[24, 20]]},
+    "srli": {"opcode": "0010011",  "funct3": "101","funct7": "0000000",  "imm_bits": [[24, 20]]},
 
-    "srai": {"opcode": "0010011",  "funct3": "101","  funct7": "0100000",  "imm_bits": [[24, 20]]},
+    "srai": {"opcode": "0010011",  "funct3": "101","funct7": "0100000",  "imm_bits": [[24, 20]]},
 
 
 
