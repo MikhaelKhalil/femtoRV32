@@ -33,6 +33,8 @@ module cpu(
     
     /* START: STAGE 1 - IF */
     wire [31:0] current_pc, next_pc;
+    wire [31:0] pc_add_four;
+    assign pc_add_four = current_pc + 32'd4;
     nbit_reg #(32) pc(
         .load(!stall && !structural_hazard_stall),
         .clk(clk),
@@ -46,14 +48,14 @@ module cpu(
     /* END: STAGE 1 - IF */
 
     /* IF/ID Register */
-    wire [31:0] if_id_pc;
+    wire [31:0] if_id_pc, if_id_pc_add_four;
     wire [31:0] if_id_instr;
-    nbit_reg #(64) if_id(
+    nbit_reg #(96) if_id(
         .load(!stall),
         .clk(clk),
         .rst(rst),
-        .data({ current_pc, instr_to_use}), // instr_to_use instead of instr for instruction flushing and structural hazard handling
-        .q({    if_id_pc,   if_id_instr}));
+        .data({ current_pc, pc_add_four,        instr_to_use}), // instr_to_use instead of instr for instruction flushing and structural hazard handling
+        .q({    if_id_pc,   if_id_pc_add_four,  if_id_instr}));
 
     /* START: STAGE 2 - ID */
     wire jalr, jump, branch, memread, memwrite, alusrc, regwrite;
@@ -109,16 +111,16 @@ module cpu(
     wire [6:0] id_ex_mem_signals; // {jump 1'b, jalr 1'b, PC_Sel 2'b, branch, memwrite, memread}
     wire [3:0] id_ex_exc_signals; //{AUIPC_Sel 1'b, alusrc 1'b, aluop 2'b}
     wire [4:0] id_ex_instr_shamt;
-    wire [31:0] id_ex_d1, id_ex_d2, id_ex_pc, id_ex_imm; 
+    wire [31:0] id_ex_d1, id_ex_d2, id_ex_pc, id_ex_pc_add_four, id_ex_imm; 
     wire id_ex_instr_30; //not the full instruction, just bit 30
     wire [2:0] id_ex_instr_funct3; //not the full instruction, just bits 14-12 (funct3)
     wire [4:0] id_ex_rd, id_ex_rs1, id_ex_rs2;
-    nbit_reg #(166) id_ex(
+    nbit_reg #(198) id_ex(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ regwrite, writeData_Sel,     jump, jalr, PC_Sel, branch, memwrite, memread, AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      if_id_pc,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2]}),
-        .q({    id_ex_wb_signals,            id_ex_mem_signals,                             id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,     id_ex_rd,            id_ex_rs1,          id_ex_rs2})
+        .data({ regwrite, writeData_Sel,    jump, jalr, PC_Sel, branch, memwrite, memread, AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      if_id_pc, if_id_pc_add_four,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2]}),
+        .q({    id_ex_wb_signals,           id_ex_mem_signals,                             id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc, id_ex_pc_add_four,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,     id_ex_rd,            id_ex_rs1,          id_ex_rs2})
     );
     
     /* Forwarding Unit */
@@ -195,7 +197,7 @@ module cpu(
     /* EX/MEM Register */
     wire [2:0] ex_mem_wb_signals; //{regwrite, writeData_Sel}
     wire [6:0] ex_mem_mem_signals; // {jump 1'b, jalr 1'b, PC_Sel 2'b, branch, memwrite, memread}
-    wire [31:0] ex_mem_pc_shifted_flow, ex_mem_alu_result, ex_mem_d2, ex_mem_pc;
+    wire [31:0] ex_mem_pc_shifted_flow, ex_mem_alu_result, ex_mem_d2, ex_mem_pc_add_four;
     wire [2:0] ex_mem_instr_funct3; //not the full instruction, just bits 14-12 (funct3)
     wire [3:0] ex_mem_alu_flags; // {cf, zf, vf, sf}
     wire [4:0] ex_mem_rd;
@@ -203,8 +205,8 @@ module cpu(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ id_ex_wb_signals_to_use,    id_ex_mem_signals_to_use,   pc_shifted_flow,        alu_result,         id_ex_d2,   cf, zf, vf, sf,     id_ex_rd,   id_ex_pc,   id_ex_instr_funct3}),
-        .q({    ex_mem_wb_signals,          ex_mem_mem_signals,         ex_mem_pc_shifted_flow, ex_mem_alu_result,  ex_mem_d2,  ex_mem_alu_flags,   ex_mem_rd,  ex_mem_pc,  ex_mem_instr_funct3})
+        .data({ id_ex_wb_signals_to_use,    id_ex_mem_signals_to_use,   pc_shifted_flow,        alu_result,         id_ex_d2,   cf, zf, vf, sf,     id_ex_rd,   id_ex_pc_add_four,  id_ex_instr_funct3}),
+        .q({    ex_mem_wb_signals,          ex_mem_mem_signals,         ex_mem_pc_shifted_flow, ex_mem_alu_result,  ex_mem_d2,  ex_mem_alu_flags,   ex_mem_rd,  ex_mem_pc_add_four,  ex_mem_instr_funct3})
     );
 
     /* START: STAGE 4 - MEM */
@@ -221,8 +223,6 @@ module cpu(
         .shouldJump(shouldJump)
     );
 
-    wire [31:0] pc_add_four;
-    assign pc_add_four = current_pc + 32'd4;
     wire [31:0] temppc;
     mux2x1 #(32) pcmux1(.a(pc_add_four), .b(ex_mem_pc_shifted_flow), .sel(shouldJump), .out(temppc));
     mux4x1 #(32) pcmux2(.a(temppc), .b(temppc), .c(ex_mem_alu_result), .d(current_pc), .sel(ex_mem_mem_signals[4:3] /* PC_Sel */), .out(next_pc));
@@ -230,13 +230,14 @@ module cpu(
     wire [31:0] mem_data;
 
     wire [31:0] addr_to_use;
-    assign addr_to_use = structural_hazard_stall /* i.e., reading/writing to data memory */ ? ex_mem_alu_result[7:0] : current_pc[7:0];
+    /* FIXME: Let DateMem start from address 200 */
+    assign addr_to_use = structural_hazard_stall /* i.e., reading/writing to data memory */ ? (ex_mem_alu_result[7:0] + 32'd200) : current_pc[7:0];
     wire [31:0] mem_output;
     Mem memory(
         .clk(clk),
         .MemRead(ex_mem_mem_signals[0]),
         .MemWrite(ex_mem_mem_signals[1]),
-        .funct3(ex_mem_instr_funct3),       // TODO: check if this is the correct method to differentiate between LW, LH, LB
+        .funct3(ex_mem_instr_funct3),
         .addr(addr_to_use),
         .data_in(ex_mem_d2),
         .data_out(mem_output)
@@ -247,22 +248,17 @@ module cpu(
     
     /* MEM/WB Register */
     wire [2:0] mem_wb_wb_signals; //{regwrite, writeData_Sel}
-    wire [31:0] mem_wb_mem_data, mem_wb_alu_result, mem_wb_pc;
+    wire [31:0] mem_wb_mem_data, mem_wb_alu_result, mem_wb_pc_add_four;
     wire [4:0] mem_wb_rd;
     nbit_reg #(104) mem_wb(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ ex_mem_wb_signals,  mem_data,           ex_mem_alu_result,  ex_mem_rd,  ex_mem_pc}),
-        .q({    mem_wb_wb_signals,  mem_wb_mem_data,    mem_wb_alu_result,  mem_wb_rd,  mem_wb_pc})
+        .data({ ex_mem_wb_signals,  mem_data,           ex_mem_alu_result,  ex_mem_rd,  ex_mem_pc_add_four}),
+        .q({    mem_wb_wb_signals,  mem_wb_mem_data,    mem_wb_alu_result,  mem_wb_rd,  mem_wb_pc_add_four})
     );
 
     /* START: STAGE 5 - WB */
-    wire [31:0] wb_pc_add_four;
-    // FIXME: (works for now) recall the jal/jalr instructions and where their values come from because this is not the correct stage to place that adder
-    assign wb_pc_add_four = mem_wb_pc + 32'd4;
-
-    mux4x1 #(32) select_wb (.a(mem_wb_alu_result), .b(mem_wb_mem_data), .c(wb_pc_add_four), .d(32'bx), .sel(mem_wb_wb_signals[1:0]), .out(wb_data));
+    mux4x1 #(32) select_wb (.a(mem_wb_alu_result), .b(mem_wb_mem_data), .c(mem_wb_pc_add_four), .d(32'bx), .sel(mem_wb_wb_signals[1:0]), .out(wb_data));
     /* END: STAGE 5 - WB */
-    
 endmodule
