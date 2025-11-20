@@ -27,7 +27,7 @@ module cpu(
     // 2) Provide a NOP instruction to the IF/ID register instead of the instruction to be stalled
     // NOTE: This type of stalling is different from that issued by the Hazard Detection Unit, because in this type we let the rest of the pipeline to work freely except for the new instruction being fetched.
     wire structural_hazard_stall;
-    structural_hazard_stall = ex_mem_mem_signals[0] /* EX/MEM.MemRead */ | ex_mem_mem_signals[1] /* EX/MEM.MemWrite */;
+    assign structural_hazard_stall = ex_mem_mem_signals[0] /* EX/MEM.MemRead */ | ex_mem_mem_signals[1] /* EX/MEM.MemWrite */;
     
     wire [31:0] instr_to_use;
     assign instr_to_use = (shouldJump | structural_hazard_stall) ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
@@ -258,7 +258,7 @@ module cpu(
     /* START: STAGE 5 - WB */
     wire [31:0] wb_pc_add_four;
     // FIXME: (works for now) recall the jal/jalr instructions and where their values come from because this is not the correct stage to place that adder
-    assign wb_pc_add_four = mem_wb_pc + 32'b4;
+    assign wb_pc_add_four = mem_wb_pc + 32'd4;
 
     mux4x1 #(32) select_wb (.a(mem_wb_alu_result), .b(mem_wb_mem_data), .c(wb_pc_add_four), .d(32'bx), .sel(mem_wb_wb_signals[1:0]), .out(wb_data));
     /* END: STAGE 5 - WB */
