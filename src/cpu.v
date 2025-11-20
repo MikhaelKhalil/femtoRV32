@@ -197,16 +197,16 @@ module cpu(
     /* EX/MEM Register */
     wire [2:0] ex_mem_wb_signals; //{regwrite, writeData_Sel}
     wire [6:0] ex_mem_mem_signals; // {jump 1'b, jalr 1'b, PC_Sel 2'b, branch, memwrite, memread}
-    wire [31:0] ex_mem_pc_shifted_flow, ex_mem_alu_result, ex_mem_d2, ex_mem_pc_add_four;
+    wire [31:0] ex_mem_pc_shifted_flow, ex_mem_alu_result, ex_mem_d2, ex_mem_pc, ex_mem_pc_add_four;
     wire [2:0] ex_mem_instr_funct3; //not the full instruction, just bits 14-12 (funct3)
     wire [3:0] ex_mem_alu_flags; // {cf, zf, vf, sf}
     wire [4:0] ex_mem_rd;
-    nbit_reg #(150) ex_mem(
+    nbit_reg #(182) ex_mem(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ id_ex_wb_signals_to_use,    id_ex_mem_signals_to_use,   pc_shifted_flow,        alu_result,         id_ex_d2,   cf, zf, vf, sf,     id_ex_rd,   id_ex_pc_add_four,  id_ex_instr_funct3}),
-        .q({    ex_mem_wb_signals,          ex_mem_mem_signals,         ex_mem_pc_shifted_flow, ex_mem_alu_result,  ex_mem_d2,  ex_mem_alu_flags,   ex_mem_rd,  ex_mem_pc_add_four,  ex_mem_instr_funct3})
+        .data({ id_ex_wb_signals_to_use,    id_ex_mem_signals_to_use,   pc_shifted_flow,        alu_result,         operand2_layer1,    cf, zf, vf, sf,     id_ex_rd,   ex_mem_pc, id_ex_pc_add_four,  id_ex_instr_funct3}),
+        .q({    ex_mem_wb_signals,          ex_mem_mem_signals,         ex_mem_pc_shifted_flow, ex_mem_alu_result,  ex_mem_d2,          ex_mem_alu_flags,   ex_mem_rd,  ex_mem_pc, ex_mem_pc_add_four,  ex_mem_instr_funct3})
     );
 
     /* START: STAGE 4 - MEM */
@@ -225,13 +225,13 @@ module cpu(
 
     wire [31:0] temppc;
     mux2x1 #(32) pcmux1(.a(pc_add_four), .b(ex_mem_pc_shifted_flow), .sel(shouldJump), .out(temppc));
-    mux4x1 #(32) pcmux2(.a(temppc), .b(temppc), .c(ex_mem_alu_result), .d(current_pc), .sel(ex_mem_mem_signals[4:3] /* PC_Sel */), .out(next_pc));
+    mux4x1 #(32) pcmux2(.a(temppc), .b(temppc), .c(ex_mem_alu_result), .d(ex_mem_pc), .sel(ex_mem_mem_signals[4:3] /* PC_Sel */), .out(next_pc));
 
     wire [31:0] mem_data;
 
     wire [31:0] addr_to_use;
     /* FIXME: Let DateMem start from address 200 */
-    assign addr_to_use = structural_hazard_stall /* i.e., reading/writing to data memory */ ? (ex_mem_alu_result[7:0] + 32'd200) : current_pc[7:0];
+    assign addr_to_use = structural_hazard_stall /* i.e., reading/writing to data memory */ ? (ex_mem_alu_result[7:0] /* + 32'd200 */) : current_pc[7:0];
     wire [31:0] mem_output;
     Mem memory(
         .clk(clk),
