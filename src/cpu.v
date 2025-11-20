@@ -9,7 +9,7 @@ module cpu(
     // In case of stalling: 1) Write Disable PC register 2) Write Disable IF/ID register 3) Replace Control Signals in the ID stage with zeros
     wire stall;
     HazardDetectionUnit hazard_detection(
-        .if_id_rs1(if_id_instr[19:15]), .if_id_rs2(if_id_instr[24:20]), .id_ex_rd(id_ex_rd),
+        .if_id_rs1(if_id_instr[`IR_rs1]), .if_id_rs2(if_id_instr[`IR_rs2]), .id_ex_rd(id_ex_rd),
         .id_ex_memread(id_ex_mem_signals[0]),
         .stall(stall)
     );
@@ -20,7 +20,9 @@ module cpu(
     // 1) Provide a NOP instruction to the IF/ID register instead of the upcoming instruction
     // 2) Replace Control Signals in the ID stage with zeros
     // 3) Replace the MEM & WB Signals going to the EX/MEM register with zeros
-    
+    wire [31:0] instr_to_use;
+    assign instr_to_use = shouldJump ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
+
     /* Stalling in case of a Structural Hazard */
     // If EX/MEM.MemRead == 1 or EX/MEM.MemWrite == 1,
     // 1) Keep the PC unchanged for the next cycle
@@ -28,9 +30,6 @@ module cpu(
     // NOTE: This type of stalling is different from that issued by the Hazard Detection Unit, because in this type we let the rest of the pipeline to work freely except for the new instruction being fetched.
     wire structural_hazard_stall;
     assign structural_hazard_stall = ex_mem_mem_signals[0] /* EX/MEM.MemRead */ | ex_mem_mem_signals[1] /* EX/MEM.MemWrite */;
-    
-    wire [31:0] instr_to_use;
-    assign instr_to_use = (shouldJump | structural_hazard_stall) ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
     
     /* START: STAGE 1 - IF */
     wire [31:0] current_pc, next_pc;
@@ -91,9 +90,9 @@ module cpu(
         .rst(rst),
         .readReg1(if_id_instr[`IR_rs1]),
         .readReg2(if_id_instr[`IR_rs2]),
-        .writeReg(if_id_instr[`IR_rd]),
+        .writeReg(mem_wb_rd),
         .writeData(wb_data),                // Belongs to the WB Stage
-        .regWrite(mem_wb_wb_signals[1]),    // Belongs to the WB Stage
+        .regWrite(mem_wb_wb_signals[2]),    // Belongs to the WB Stage
         .readData1(data1),
         .readData2(data2)
     );
@@ -113,13 +112,13 @@ module cpu(
     wire [31:0] id_ex_d1, id_ex_d2, id_ex_pc, id_ex_imm; 
     wire id_ex_instr_30; //not the full instruction, just bit 30
     wire [2:0] id_ex_instr_funct3; //not the full instruction, just bits 14-12 (funct3)
-    wire [4:0] id_ex_rd;
-    nbit_reg #(156) id_ex(
+    wire [4:0] id_ex_rd, id_ex_rs1, id_ex_rs2;
+    nbit_reg #(166) id_ex(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ regwrite, writeData_Sel,     jump, jalr, PC_Sel, branch, memwrite, memread, AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      if_id_pc,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[11:7]}),
-        .q({    id_ex_wb_signals,            id_ex_mem_signals,                             id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,     id_ex_rd})
+        .data({ regwrite, writeData_Sel,     jump, jalr, PC_Sel, branch, memwrite, memread, AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      if_id_pc,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2]}),
+        .q({    id_ex_wb_signals,            id_ex_mem_signals,                             id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,     id_ex_rd,            id_ex_rs1,          id_ex_rs2})
     );
     
     /* Forwarding Unit */
@@ -127,18 +126,18 @@ module cpu(
     // Plus, choosing ALU Operands for the upcoming EX stage
     wire [1:0] forwardA, forwardB;
     ForwardingUnit forwarding(
-        .ex_mem_regwrite(ex_mem_wb_signals[1]),
+        .ex_mem_regwrite(ex_mem_wb_signals[2]),
         .ex_mem_rd(ex_mem_rd),
         .id_ex_rs1(id_ex_rs1),
         .id_ex_rs2(id_ex_rs2),  
-        .mem_wb_regwrite(mem_wb_wb_signals[1]),
+        .mem_wb_regwrite(mem_wb_wb_signals[2]),
         .mem_wb_rd(mem_wb_rd),
         .forwardA(forwardA),
         .forwardB(forwardB)
     );
 
-    reg [31:0] operand1_layer1, operand1;
-    wire [31:0] operand2_layer1, operand2;
+    reg [31:0] operand1_layer1, operand2_layer1;
+    wire [31:0] operand1, operand2;
     wire [31:0] alu_shamt;
     // First layer of Muxes (Big Muxes)
     always @(*) begin
@@ -158,7 +157,7 @@ module cpu(
     // Second layer of Muxes (Small Muxes)
     mux2x1 #(32) data1_pick(.a(operand1_layer1), .b(id_ex_pc), .sel(id_ex_exc_signals[3] /* AUIPC_Sel */), .out(operand1));
     mux2x1 #(32) data2_pick(.a(operand2_layer1), .b(id_ex_imm), .sel(id_ex_exc_signals[2] /* alusrc */), .out(operand2));
-    mux2x1 #(32) shamt_pick(.a(operand2_layer1), .b(id_ex_instr_shamt), .sel(id_ex_exc_signals[2] /* alusrc */), .out(alu_shamt));
+    mux2x1 #(32) shamt_pick(.a(operand2_layer1), .b({27'b0, id_ex_instr_shamt}), .sel(id_ex_exc_signals[2] /* alusrc */), .out(alu_shamt));
         
     /* START: STAGE 3 - EX */
     wire [31:0] pc_shifted_flow;
@@ -189,9 +188,9 @@ module cpu(
     
     // For Instruction Flushing
     wire [2:0] id_ex_wb_signals_to_use;
-    wire [2:0] id_ex_mem_signals_to_use;
+    wire [6:0] id_ex_mem_signals_to_use;
     assign id_ex_wb_signals_to_use = shouldJump ? 3'b0 : id_ex_wb_signals;
-    assign id_ex_mem_signals_to_use = shouldJump ? 3'b0 : id_ex_mem_signals;
+    assign id_ex_mem_signals_to_use = shouldJump ? 7'b0 : id_ex_mem_signals;
 
     /* EX/MEM Register */
     wire [2:0] ex_mem_wb_signals; //{regwrite, writeData_Sel}
@@ -225,13 +224,14 @@ module cpu(
     wire [31:0] pc_add_four;
     assign pc_add_four = current_pc + 32'd4;
     wire [31:0] temppc;
-    mux2x1 #(32) pcmux1(.a(pc_add_four), .b(pc_shifted_flow), .sel(shouldJump), .out(temppc));
+    mux2x1 #(32) pcmux1(.a(pc_add_four), .b(ex_mem_pc_shifted_flow), .sel(shouldJump), .out(temppc));
     mux4x1 #(32) pcmux2(.a(temppc), .b(temppc), .c(ex_mem_alu_result), .d(current_pc), .sel(ex_mem_mem_signals[4:3] /* PC_Sel */), .out(next_pc));
 
     wire [31:0] mem_data;
-    
+
     wire [31:0] addr_to_use;
     assign addr_to_use = structural_hazard_stall /* i.e., reading/writing to data memory */ ? ex_mem_alu_result[7:0] : current_pc[7:0];
+    wire [31:0] mem_output;
     Mem memory(
         .clk(clk),
         .MemRead(ex_mem_mem_signals[0]),
@@ -239,21 +239,23 @@ module cpu(
         .funct3(ex_mem_instr_funct3),       // TODO: check if this is the correct method to differentiate between LW, LH, LB
         .addr(addr_to_use),
         .data_in(ex_mem_d2),
-        .data_out(mem_data)
+        .data_out(mem_output)
     );
+    assign mem_data = structural_hazard_stall ? mem_output : 32'b0;
+    assign instr = structural_hazard_stall ? 32'b0000000_00000_00000_000_00000_0110011 : mem_output;    // add x0, x0, x0   # [NOP]
     /* END: STAGE 4 - MEM */
     
     /* MEM/WB Register */
     wire [2:0] mem_wb_wb_signals; //{regwrite, writeData_Sel}
     wire [31:0] mem_wb_mem_data, mem_wb_alu_result, mem_wb_pc;
     wire [4:0] mem_wb_rd;
-    nbit_reg #(71) mem_wb(
+    nbit_reg #(104) mem_wb(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
         .data({ ex_mem_wb_signals,  mem_data,           ex_mem_alu_result,  ex_mem_rd,  ex_mem_pc}),
         .q({    mem_wb_wb_signals,  mem_wb_mem_data,    mem_wb_alu_result,  mem_wb_rd,  mem_wb_pc})
-        );
+    );
 
     /* START: STAGE 5 - WB */
     wire [31:0] wb_pc_add_four;

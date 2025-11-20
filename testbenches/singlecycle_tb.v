@@ -21,7 +21,8 @@ module singlecycle_tb();
         #(clk_period * 2);
         
         rst = 0;
-        #(clk_period * 51);
+        // #(clk_period * 51);
+        #(clk_period * 220);
         $finish();
     end
 endmodule

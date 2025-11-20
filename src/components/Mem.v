@@ -12,7 +12,6 @@ module Mem(
     reg [7:0] mem [0:255];
 
     // Load
-    assign data_out = mem[addr];
     always @(*) begin
         if (MemRead) begin
             case (funct3)
@@ -64,12 +63,12 @@ module Mem(
         {mem[43], mem[42], mem[41], mem[40]}    = 32'b0000000_00001_00110_111_00111_0110011;    // and x7, x6, x1    # 0
         {mem[47], mem[46], mem[45], mem[44]}    = 32'b0100000_00010_00001_000_01000_0110011;    // sub x8, x1, x2    # 8
         {mem[51], mem[50], mem[49], mem[48]}    = 32'b0000000_00010_00001_000_00000_0110011;    // add x0, x1, x2    # 26, write to reg x0 -> 0
-        {mem[56], mem[54], mem[53], mem[52]}    = 32'b0000000_00001_00000_000_01001_0110011;    // add x9, x0, x1    # 17
+        {mem[55], mem[54], mem[53], mem[52]}    = 32'b0000000_00001_00000_000_01001_0110011;    // add x9, x0, x1    # 17
 
         /* Let DateMem start from address 64 */
-        mem[64]=32'd17;
-        mem[65]=32'd9;
-        mem[65]=32'd25;
+        {mem[67], mem[66], mem[65], mem[64]}=32'd17;
+        {mem[71], mem[70], mem[69], mem[68]}=32'd9;
+        {mem[75], mem[74], mem[73], mem[72]}=32'd25;
     end
     
 endmodule
