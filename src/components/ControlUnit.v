@@ -160,7 +160,7 @@ always @(*) begin
 			AUIPC_Sel = 1'b0;      // Use rs1 (not used)
 			endProgram = 1'b1;     // Halt execution
 		end
-		5'b10_001: begin // OPCODE_Custom TODO:, nop:
+		5'b10_001: begin // OPCODE_Custom TODO: nop:
 			Jalr = 1'b0;
 			Jump = 1'b0;
 			Branch = 1'b0;
@@ -174,7 +174,7 @@ always @(*) begin
 			AUIPC_Sel = 1'b0;      // Use rs1 (default)
 			endProgram = 1'b0;
 		end
-		default: begin // Default to exception
+		default: begin // Default to exception (halt)
 			Jalr = 1'b0;
 			Jump = 1'b0;
 			Branch = 1'b0;
@@ -183,10 +183,10 @@ always @(*) begin
 			MemWrite = 1'b0;
 			ALUSrc = 1'b0;
 			RegWrite = 1'b0;
-			PC_Sel = 2'b11;        // PC+4
+			PC_Sel = 2'b11;        // Halt (don't update PC)
 			writeData_Sel = 2'b00; // ALU (not used, RegWrite=0)
-			AUIPC_Sel = 1'b0;      // Use rs1 (default)
-			endProgram = 1'b0;
+			AUIPC_Sel = 1'b0;      // Use rs1 (not used)
+			endProgram = 1'b1;	   // Halt execution
 		end
 	endcase
 end

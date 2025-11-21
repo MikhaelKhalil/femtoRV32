@@ -21,7 +21,7 @@ module cpu(
     // 2) Replace Control Signals in the ID stage with zeros
     // 3) Replace the MEM & WB Signals going to the EX/MEM register with zeros
     wire [31:0] instr_to_use;
-    assign instr_to_use = shouldJump ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
+    assign instr_to_use = (shouldJump | ex_mem_mem_signals[7] /* endProgram */) ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
 
     /* Stalling in case of a Structural Hazard */
     // If EX/MEM.MemRead == 1 or EX/MEM.MemWrite == 1,
@@ -82,7 +82,15 @@ module cpu(
 
     // For Stalling (from the Hazard Detection Unit)    => stall signal
     // and Instruction Flushing                         => shouldJump signal (because the currently used branch predictor is an implicit always-not-taken predictor)
-    assign {jalr, jump, branch, memread, aluop [1:0], memwrite, alusrc, regwrite, PC_Sel [1:0], writeData_Sel [1:0], AUIPC_Sel, endProgram} = (stall | shouldJump) ? 8'b0 : control_unit_outputs;
+    //                                                  => endProgram signal (passed through the EX/MEM register) to flush successive instructions and halt execution
+    assign {jalr, jump, branch, memread, aluop [1:0], memwrite, alusrc, regwrite, PC_Sel [1:0], writeData_Sel [1:0], AUIPC_Sel, endProgram} = (stall | shouldJump | ex_mem_mem_signals[7] /* endProgram */) ? 8'b0 : control_unit_outputs;
+
+    // In case of halting, force PC_Sel to 11 (halt) at the PC of the instruction caused halting
+    wire [1:0] PC_Sel_to_use;
+    wire endProgram_to_use;
+    assign {endProgram_to_use, PC_Sel_to_use} = ex_mem_mem_signals[7] /* endProgram */ ? {1'b1, 2'b11} : {endProgram, PC_Sel};
+    wire [31:0] id_ex_pc_to_use;
+    assign id_ex_pc_to_use = ex_mem_mem_signals[7] /* endProgram */ ? ex_mem_pc : if_id_pc;
     
     /* WB => negedge clk */
     wire [31:0] data1, data2;
@@ -108,19 +116,19 @@ module cpu(
 
     /* ID/EX Register */
     wire [2:0] id_ex_wb_signals; //{regwrite, writeData_Sel}
-    wire [6:0] id_ex_mem_signals; // {jump 1'b, jalr 1'b, PC_Sel 2'b, branch, memwrite, memread}
+    wire [7:0] id_ex_mem_signals; // {endProgram 1'b, jump 1'b, jalr 1'b, PC_Sel 2'b, branch, memwrite, memread}
     wire [3:0] id_ex_exc_signals; //{AUIPC_Sel 1'b, alusrc 1'b, aluop 2'b}
     wire [4:0] id_ex_instr_shamt;
     wire [31:0] id_ex_d1, id_ex_d2, id_ex_pc, id_ex_pc_add_four, id_ex_imm; 
     wire id_ex_instr_30; //not the full instruction, just bit 30
     wire [2:0] id_ex_instr_funct3; //not the full instruction, just bits 14-12 (funct3)
     wire [4:0] id_ex_rd, id_ex_rs1, id_ex_rs2;
-    nbit_reg #(198) id_ex(
+    nbit_reg #(199) id_ex(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ regwrite, writeData_Sel,    jump, jalr, PC_Sel, branch, memwrite, memread, AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      if_id_pc, if_id_pc_add_four,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2]}),
-        .q({    id_ex_wb_signals,           id_ex_mem_signals,                             id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc, id_ex_pc_add_four,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,     id_ex_rd,            id_ex_rs1,          id_ex_rs2})
+        .data({ regwrite, writeData_Sel,    endProgram_to_use, jump, jalr, PC_Sel_to_use, branch, memwrite, memread,    AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      id_ex_pc_to_use,   if_id_pc_add_four,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2]}),
+        .q({    id_ex_wb_signals,           id_ex_mem_signals,                                                          id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc,          id_ex_pc_add_four,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,    id_ex_rd,             id_ex_rs1,            id_ex_rs2})
     );
     
     /* Forwarding Unit */
@@ -190,22 +198,22 @@ module cpu(
     
     // For Instruction Flushing
     wire [2:0] id_ex_wb_signals_to_use;
-    wire [6:0] id_ex_mem_signals_to_use;
+    wire [7:0] id_ex_mem_signals_to_use;
     assign id_ex_wb_signals_to_use = shouldJump ? 3'b0 : id_ex_wb_signals;
-    assign id_ex_mem_signals_to_use = shouldJump ? 7'b0 : id_ex_mem_signals;
+    assign id_ex_mem_signals_to_use = shouldJump ? 8'b0 : id_ex_mem_signals;
 
     /* EX/MEM Register */
     wire [2:0] ex_mem_wb_signals; //{regwrite, writeData_Sel}
-    wire [6:0] ex_mem_mem_signals; // {jump 1'b, jalr 1'b, PC_Sel 2'b, branch, memwrite, memread}
+    wire [7:0] ex_mem_mem_signals; // {endProgram 1'b, jump 1'b, jalr 1'b, PC_Sel 2'b, branch, memwrite, memread}
     wire [31:0] ex_mem_pc_shifted_flow, ex_mem_alu_result, ex_mem_d2, ex_mem_pc, ex_mem_pc_add_four;
     wire [2:0] ex_mem_instr_funct3; //not the full instruction, just bits 14-12 (funct3)
     wire [3:0] ex_mem_alu_flags; // {cf, zf, vf, sf}
     wire [4:0] ex_mem_rd;
-    nbit_reg #(182) ex_mem(
+    nbit_reg #(183) ex_mem(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ id_ex_wb_signals_to_use,    id_ex_mem_signals_to_use,   pc_shifted_flow,        alu_result,         operand2_layer1,    cf, zf, vf, sf,     id_ex_rd,   ex_mem_pc, id_ex_pc_add_four,  id_ex_instr_funct3}),
+        .data({ id_ex_wb_signals_to_use,    id_ex_mem_signals_to_use,   pc_shifted_flow,        alu_result,         operand2_layer1,    cf, zf, vf, sf,     id_ex_rd,   id_ex_pc,  id_ex_pc_add_four,  id_ex_instr_funct3}),
         .q({    ex_mem_wb_signals,          ex_mem_mem_signals,         ex_mem_pc_shifted_flow, ex_mem_alu_result,  ex_mem_d2,          ex_mem_alu_flags,   ex_mem_rd,  ex_mem_pc, ex_mem_pc_add_four,  ex_mem_instr_funct3})
     );
 

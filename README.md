@@ -47,7 +47,7 @@
 - [x] \* ECALL
 - [x] \* EBREAK
 
-\* all of these instructions are implemented as a halting behaviour where the PC doesn't get updated anymore.
+\* these instructions are implemented as a halting behaviour where the PC doesn't get updated anymore.
 
 ## Milestone 2 - Pipelined with Full-Forwarding Implementation (Full RISC-V ISA Support)
 

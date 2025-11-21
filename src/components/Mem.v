@@ -50,6 +50,7 @@ module Mem(
     initial begin
         /* Let the IMEM start from address 0 */
         /* Test Program from Lab 08 */
+        /*
         {mem[3], mem[2], mem[1], mem[0]}        = 32'b0000000_00000_00000_000_00000_0110011;    // add x0, x0, x0    # [NOP]
         //added to be skipped since PC starts with 4 after reset
         {mem[7], mem[6], mem[5], mem[4]}        = 32'b00000100000000000010000010000011;         // lw x1, 64(x0)     # 17
@@ -65,10 +66,11 @@ module Mem(
         {mem[47], mem[46], mem[45], mem[44]}    = 32'b0100000_00010_00001_000_01000_0110011;    // sub x8, x1, x2    # 8
         {mem[51], mem[50], mem[49], mem[48]}    = 32'b0000000_00010_00001_000_00000_0110011;    // add x0, x1, x2    # 26, write to reg x0 -> 0
         {mem[55], mem[54], mem[53], mem[52]}    = 32'b0000000_00001_00000_000_01001_0110011;    // add x9, x0, x1    # 17
-        Data
+        // Data
         {mem[67], mem[66], mem[65], mem[64]}=32'd17;
         {mem[71], mem[70], mem[69], mem[68]}=32'd9;
         {mem[75], mem[74], mem[73], mem[72]}=32'd25;
+        */
 
         /* Test Program from Milestone 1 */
         {mem[3], mem[2], mem[1], mem[0]} = 32'b00010010001101000101000010110111;      // LUI   x1, 0x12345    # 0x12345000
