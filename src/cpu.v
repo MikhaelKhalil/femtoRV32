@@ -15,13 +15,15 @@ module cpu(
     );
 
     /* Instruction Flushing */
-    // Flushing instructions in case of a wrong branch. i.e., according to the (shouldJump) signal
+    // Flushing instructions in case of a mispredicted branch
     // In case of the need to flush:
     // 1) Provide a NOP instruction to the IF/ID register instead of the upcoming instruction
     // 2) Replace Control Signals in the ID stage with zeros
     // 3) Replace the MEM & WB Signals going to the EX/MEM register with zeros
+    wire mispredict;  
+    wire [31:0] next_pc_corrected; 
     wire [31:0] instr_to_use;
-    assign instr_to_use = (shouldJump | ex_mem_mem_signals[7] /* endProgram */) ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
+    assign instr_to_use = (mispredict | ex_mem_mem_signals[7] /* endProgram */) ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
 
     /* Stalling in case of a Structural Hazard */
     // If EX/MEM.MemRead == 1 or EX/MEM.MemWrite == 1,
@@ -35,6 +37,55 @@ module cpu(
     wire [31:0] current_pc, next_pc;
     wire [31:0] pc_add_four;
     assign pc_add_four = current_pc + 32'd4;
+
+    wire branch_prediction;
+    wire [31:0] predictor_update_pc;
+    wire predictor_actual_taken;
+    wire predictor_update_enable;
+    BranchPredictor predictor(
+        .clk(clk),
+        .rst(rst),
+        .pc(current_pc),
+        .update_pc(predictor_update_pc),
+        .actual_taken(predictor_actual_taken),
+        .update_enable(predictor_update_enable),
+        .prediction(branch_prediction)
+    );
+
+    // Mem module instantiated below with the MEM stage below
+    wire [31:0] instr;
+
+    // Early branch detection in IF stage
+    wire is_branch_inst, is_jal_inst, is_jalr_inst;
+    assign is_branch_inst = (instr[6:2] == `OPCODE_Branch);
+    assign is_jal_inst = (instr[6:2] == `OPCODE_JAL);
+    assign is_jalr_inst = (instr[6:2] == `OPCODE_JALR);
+
+    // Generate branch immediate in IF stage (for branches only)
+    wire [31:0] branch_imm_if;
+    assign branch_imm_if = { {20{instr[31]}}, instr[7], instr[30:25], instr[11:8], 1'b0 };
+
+    // Generate JAL immediate in IF stage
+    wire [31:0] jal_imm_if;
+    assign jal_imm_if = { {12{instr[31]}}, instr[19:12], instr[20], instr[30:25], instr[24:21], 1'b0 };
+
+    // Calculate predicted branch/JAL target
+    wire [31:0] predicted_branch_target;
+    assign predicted_branch_target = current_pc + branch_imm_if;
+    wire [31:0] predicted_jal_target;
+    assign predicted_jal_target = current_pc + jal_imm_if;
+
+    // Select next PC based on prediction
+    // For branches: use predictor
+    // For JAL: always taken (predict target)
+    // For JALR: always taken but target depends on rs1, so we can't predict in IF - use PC+4 and handle in MEM
+    // For others: PC+4
+    wire [31:0] next_pc_predicted;
+    assign next_pc_predicted = (is_branch_inst && branch_prediction) ? predicted_branch_target : (is_jal_inst) ? predicted_jal_target : pc_add_four;
+
+    // Use corrected PC if there's a misprediction, otherwise use predicted PC
+    assign next_pc = mispredict ? next_pc_corrected : next_pc_predicted;
+
     nbit_reg #(32) pc(
         .load(!stall && !structural_hazard_stall),
         .clk(clk),
@@ -43,19 +94,23 @@ module cpu(
         .q(current_pc)
     );
     
-    // Mem module instantiated below with the MEM stage below
-    wire [31:0] instr;
     /* END: STAGE 1 - IF */
 
     /* IF/ID Register */
     wire [31:0] if_id_pc, if_id_pc_add_four;
     wire [31:0] if_id_instr;
-    nbit_reg #(96) if_id(
+    wire [31:0] if_id_predicted_pc;
+    wire if_id_prediction;
+    wire if_id_is_branch;
+    wire if_id_is_jal;
+    wire if_id_is_jalr;
+    wire [31:0] if_id_branch_pc;
+    nbit_reg #(162) if_id(
         .load(!stall),
         .clk(clk),
         .rst(rst),
-        .data({ current_pc, pc_add_four,        instr_to_use}), // instr_to_use instead of instr for instruction flushing and structural hazard handling
-        .q({    if_id_pc,   if_id_pc_add_four,  if_id_instr}));
+        .data({ current_pc, pc_add_four,        instr_to_use, next_pc_predicted, branch_prediction, is_branch_inst, is_jal_inst, current_pc}), // instr_to_use instead of instr for instruction flushing and structural hazard handling
+        .q({    if_id_pc,   if_id_pc_add_four,  if_id_instr, if_id_predicted_pc, if_id_prediction, if_id_is_branch, if_id_is_jal, if_id_is_jalr, if_id_branch_pc}));
 
     /* START: STAGE 2 - ID */
     wire jalr, jump, branch, memread, memwrite, alusrc, regwrite;
@@ -83,12 +138,13 @@ module cpu(
     // For Stalling (from the Hazard Detection Unit)    => stall signal
     // and Instruction Flushing                         => shouldJump signal (because the currently used branch predictor is an implicit always-not-taken predictor)
     //                                                  => endProgram signal (passed through the EX/MEM register) to flush successive instructions and halt execution
-    assign {jalr, jump, branch, memread, aluop [1:0], memwrite, alusrc, regwrite, PC_Sel [1:0], writeData_Sel [1:0], AUIPC_Sel, endProgram} = (stall | shouldJump | ex_mem_mem_signals[7] /* endProgram */) ? 8'b0 : control_unit_outputs;
+    assign {jalr, jump, branch, memread, aluop [1:0], memwrite, alusrc, regwrite, PC_Sel [1:0], writeData_Sel [1:0], AUIPC_Sel, endProgram} = (stall | mispredict | ex_mem_mem_signals[7] /* endProgram */) ? 15'b0 : control_unit_outputs;
 
     // In case of halting, force PC_Sel to 11 (halt) at the PC of the instruction caused halting
     wire [1:0] PC_Sel_to_use;
     wire endProgram_to_use;
     assign {endProgram_to_use, PC_Sel_to_use} = ex_mem_mem_signals[7] /* endProgram */ ? {1'b1, 2'b11} : {endProgram, PC_Sel};
+
     wire [31:0] id_ex_pc_to_use;
     assign id_ex_pc_to_use = ex_mem_mem_signals[7] /* endProgram */ ? ex_mem_pc : if_id_pc;
     
@@ -123,12 +179,14 @@ module cpu(
     wire id_ex_instr_30; //not the full instruction, just bit 30
     wire [2:0] id_ex_instr_funct3; //not the full instruction, just bits 14-12 (funct3)
     wire [4:0] id_ex_rd, id_ex_rs1, id_ex_rs2;
-    nbit_reg #(199) id_ex(
+    wire id_ex_prediction, id_ex_is_branch, id_ex_is_jal, id_ex_is_jalr;
+    wire [31:0] id_ex_predicted_pc, id_ex_branch_pc;
+    nbit_reg #(265) id_ex(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ regwrite, writeData_Sel,    endProgram_to_use, jump, jalr, PC_Sel_to_use, branch, memwrite, memread,    AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      id_ex_pc_to_use,   if_id_pc_add_four,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2]}),
-        .q({    id_ex_wb_signals,           id_ex_mem_signals,                                                          id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc,          id_ex_pc_add_four,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,    id_ex_rd,             id_ex_rs1,            id_ex_rs2})
+        .data({ regwrite, writeData_Sel,    endProgram_to_use, jump, jalr, PC_Sel_to_use, branch, memwrite, memread,    AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      id_ex_pc_to_use,   if_id_pc_add_four,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2], if_id_predicted_pc, if_id_prediction, if_id_is_branch, if_id_is_jal, if_id_is_jalr, if_id_branch_pc}),
+        .q({    id_ex_wb_signals,           id_ex_mem_signals,                                                          id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc,          id_ex_pc_add_four,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,    id_ex_rd,             id_ex_rs1,            id_ex_rs2,            id_ex_predicted_pc, id_ex_prediction, id_ex_is_branch, id_ex_is_jal, id_ex_is_jalr, id_ex_branch_pc})
     );
     
     /* Forwarding Unit */
@@ -199,8 +257,8 @@ module cpu(
     // For Instruction Flushing
     wire [2:0] id_ex_wb_signals_to_use;
     wire [7:0] id_ex_mem_signals_to_use;
-    assign id_ex_wb_signals_to_use = shouldJump ? 3'b0 : id_ex_wb_signals;
-    assign id_ex_mem_signals_to_use = shouldJump ? 8'b0 : id_ex_mem_signals;
+    assign id_ex_wb_signals_to_use = (mispredict | ex_mem_mem_signals[7] /* endProgram */) ? 3'b0 : id_ex_wb_signals;
+    assign id_ex_mem_signals_to_use = (mispredict | ex_mem_mem_signals[7] /* endProgram */) ? 8'b0 : id_ex_mem_signals;
 
     /* EX/MEM Register */
     wire [2:0] ex_mem_wb_signals; //{regwrite, writeData_Sel}
@@ -209,12 +267,15 @@ module cpu(
     wire [2:0] ex_mem_instr_funct3; //not the full instruction, just bits 14-12 (funct3)
     wire [3:0] ex_mem_alu_flags; // {cf, zf, vf, sf}
     wire [4:0] ex_mem_rd;
-    nbit_reg #(183) ex_mem(
+    wire [31:0] ex_mem_predicted_pc;
+    wire ex_mem_prediction, ex_mem_is_branch, ex_mem_is_jal, ex_mem_is_jalr;
+    wire [31:0] ex_mem_branch_pc;
+    nbit_reg #(249) ex_mem(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ id_ex_wb_signals_to_use,    id_ex_mem_signals_to_use,   pc_shifted_flow,        alu_result,         operand2_layer1,    cf, zf, vf, sf,     id_ex_rd,   id_ex_pc,  id_ex_pc_add_four,  id_ex_instr_funct3}),
-        .q({    ex_mem_wb_signals,          ex_mem_mem_signals,         ex_mem_pc_shifted_flow, ex_mem_alu_result,  ex_mem_d2,          ex_mem_alu_flags,   ex_mem_rd,  ex_mem_pc, ex_mem_pc_add_four,  ex_mem_instr_funct3})
+        .data({ id_ex_wb_signals_to_use,    id_ex_mem_signals_to_use,   pc_shifted_flow,        alu_result,         operand2_layer1,    cf, zf, vf, sf,     id_ex_rd,   id_ex_pc,  id_ex_pc_add_four,  id_ex_instr_funct3, id_ex_predicted_pc, id_ex_prediction, id_ex_is_branch, id_ex_is_jal, id_ex_is_jalr, id_ex_branch_pc}),
+        .q({    ex_mem_wb_signals,          ex_mem_mem_signals,         ex_mem_pc_shifted_flow, ex_mem_alu_result,  ex_mem_d2,          ex_mem_alu_flags,   ex_mem_rd,  ex_mem_pc, ex_mem_pc_add_four,  ex_mem_instr_funct3, ex_mem_predicted_pc, ex_mem_prediction, ex_mem_is_branch, ex_mem_is_jal, ex_mem_is_jalr, ex_mem_branch_pc})
     );
 
     /* START: STAGE 4 - MEM */
@@ -231,9 +292,35 @@ module cpu(
         .shouldJump(shouldJump)
     );
 
+    // misprediction detection
+    // For branches: compare prediction with actual outcome
+    wire actual_taken_branch;
+    assign actual_taken_branch = ex_mem_is_branch ? shouldJump : 1'b0;
+    
+    wire branch_mispredict;
+    assign branch_mispredict = ex_mem_is_branch && (ex_mem_prediction != actual_taken_branch);
+    
+    // For JAL: check if we predicted correctly (JAL is always taken, target is pc_shifted_flow)
+    wire jal_mispredict;
+    assign jal_mispredict = ex_mem_is_jal && (ex_mem_predicted_pc != ex_mem_pc_shifted_flow);
+    
+    // For JALR: always taken, but we can't predict target in IF (depends on rs1)
+    // So JALR always causes a "mispredict" in the sense that we need to flush and update PC
+    wire jalr_mispredict;
+    assign jalr_mispredict = ex_mem_is_jalr;  // JALR always needs PC correction since we can't predict target
+    
+    // Overall misprediction signal
+    assign mispredict = branch_mispredict || jal_mispredict || jalr_mispredict;
+    
+    // Update predictor
+    // Only update for branches (JAL and JALR are always taken, no need to predict)
+    assign predictor_update_pc = ex_mem_branch_pc;
+    assign predictor_actual_taken = actual_taken_branch;
+    assign predictor_update_enable = ex_mem_is_branch;
+
     wire [31:0] temppc;
-    mux2x1 #(32) pcmux1(.a(pc_add_four), .b(ex_mem_pc_shifted_flow), .sel(shouldJump), .out(temppc));
-    mux4x1 #(32) pcmux2(.a(temppc), .b(temppc), .c(ex_mem_alu_result), .d(ex_mem_pc), .sel(ex_mem_mem_signals[4:3] /* PC_Sel */), .out(next_pc));
+    mux2x1 #(32) pcmux1(.a(ex_mem_pc_add_four), .b(ex_mem_pc_shifted_flow), .sel(shouldJump), .out(temppc));
+    mux4x1 #(32) pcmux2(.a(temppc), .b(temppc), .c(ex_mem_alu_result), .d(ex_mem_pc), .sel(ex_mem_mem_signals[4:3] /* PC_Sel */), .out(next_pc_corrected));
 
     wire [31:0] mem_data;
 
