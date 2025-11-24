@@ -9,7 +9,7 @@ module Mem(
     input [31:0] data_in,
     output reg [31:0] data_out
 );
-    reg [7:0] mem [0:255];
+    reg [7:0] mem [0:255];  // 256 bytes
 
     // Load
     always @(*) begin
@@ -72,7 +72,7 @@ module Mem(
         {mem[75], mem[74], mem[73], mem[72]}=32'd25;
         */
 
-        /* Test Program from Milestone 1 */
+        /* Comprehensive Test Program */
         {mem[3], mem[2], mem[1], mem[0]} = 32'b00010010001101000101000010110111;      // LUI   x1, 0x12345    # 0x12345000
         {mem[7], mem[6], mem[5], mem[4]} = 32'b00000000000000010000000100010111;      // AUIPC x2, 0x10       # 0x10004
         {mem[11], mem[10], mem[9], mem[8]} = 32'b00000000010100001000000110010011;      // ADDI  x3, x1, 5      # 305418245

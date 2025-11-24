@@ -2,7 +2,13 @@
 `include "../defines.v"
 
 module cpu(
-    input clk, rst
+    input clk, rst,
+    // FPGA input ports
+    input [1:0] ledSel, // LED selection (2 switches)
+    input [3:0] ssdSel, // SSD selection (4 switches)
+    // FPGA output ports
+    output [15:0] leds, // 16 LEDs output
+    output [12:0] ssd   // 13-bit SSD output
 );
     /* Hazard Detection Unit */
     // Stalling for one cycle in case of encountring a Load-Use Hazard
@@ -21,7 +27,7 @@ module cpu(
     // 2) Replace Control Signals in the ID stage with zeros
     // 3) Replace the MEM & WB Signals going to the EX/MEM register with zeros
     wire [31:0] instr_to_use;
-    assign instr_to_use = (shouldJump | ex_mem_mem_signals[7] /* endProgram */) ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
+    assign instr_to_use = (shouldJump | endProgram) ? 32'b0000000_00000_00000_000_00000_0110011 : instr;       // add x0, x0, x0   # [NOP]
 
     /* Stalling in case of a Structural Hazard */
     // If EX/MEM.MemRead == 1 or EX/MEM.MemWrite == 1,
@@ -36,7 +42,7 @@ module cpu(
     wire [31:0] pc_add_four;
     assign pc_add_four = current_pc + 32'd4;
     nbit_reg #(32) pc(
-        .load(!stall && !structural_hazard_stall),
+        .load(!stall && !structural_hazard_stall && !endProgram),
         .clk(clk),
         .rst(rst),
         .data(next_pc),
@@ -51,7 +57,7 @@ module cpu(
     wire [31:0] if_id_pc, if_id_pc_add_four;
     wire [31:0] if_id_instr;
     nbit_reg #(96) if_id(
-        .load(!stall),
+        .load(!stall && !endProgram),
         .clk(clk),
         .rst(rst),
         .data({ current_pc, pc_add_four,        instr_to_use}), // instr_to_use instead of instr for instruction flushing and structural hazard handling
@@ -83,15 +89,8 @@ module cpu(
     // For Stalling (from the Hazard Detection Unit)    => stall signal
     // and Instruction Flushing                         => shouldJump signal (because the currently used branch predictor is an implicit always-not-taken predictor)
     //                                                  => endProgram signal (passed through the EX/MEM register) to flush successive instructions and halt execution
-    assign {jalr, jump, branch, memread, aluop [1:0], memwrite, alusrc, regwrite, PC_Sel [1:0], writeData_Sel [1:0], AUIPC_Sel, endProgram} = (stall | shouldJump | ex_mem_mem_signals[7] /* endProgram */) ? 8'b0 : control_unit_outputs;
+    assign {jalr, jump, branch, memread, aluop [1:0], memwrite, alusrc, regwrite, PC_Sel [1:0], writeData_Sel [1:0], AUIPC_Sel, endProgram} = (stall | shouldJump | endProgram) ? 15'b0 : control_unit_outputs;
 
-    // In case of halting, force PC_Sel to 11 (halt) at the PC of the instruction caused halting
-    wire [1:0] PC_Sel_to_use;
-    wire endProgram_to_use;
-    assign {endProgram_to_use, PC_Sel_to_use} = ex_mem_mem_signals[7] /* endProgram */ ? {1'b1, 2'b11} : {endProgram, PC_Sel};
-    wire [31:0] id_ex_pc_to_use;
-    assign id_ex_pc_to_use = ex_mem_mem_signals[7] /* endProgram */ ? ex_mem_pc : if_id_pc;
-    
     /* WB => negedge clk */
     wire [31:0] data1, data2;
     wire [31:0] wb_data;
@@ -127,8 +126,8 @@ module cpu(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ regwrite, writeData_Sel,    endProgram_to_use, jump, jalr, PC_Sel_to_use, branch, memwrite, memread,    AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      id_ex_pc_to_use,   if_id_pc_add_four,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2]}),
-        .q({    id_ex_wb_signals,           id_ex_mem_signals,                                                          id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc,          id_ex_pc_add_four,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,    id_ex_rd,             id_ex_rs1,            id_ex_rs2})
+        .data({ regwrite, writeData_Sel,    endProgram, jump, jalr, PC_Sel, branch, memwrite, memread,    AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      if_id_pc,   if_id_pc_add_four,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2]}),
+        .q({    id_ex_wb_signals,           id_ex_mem_signals,                                            id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc,   id_ex_pc_add_four,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,    id_ex_rd,             id_ex_rs1,            id_ex_rs2})
     );
     
     /* Forwarding Unit */
@@ -233,20 +232,21 @@ module cpu(
 
     wire [31:0] temppc;
     mux2x1 #(32) pcmux1(.a(pc_add_four), .b(ex_mem_pc_shifted_flow), .sel(shouldJump), .out(temppc));
-    mux4x1 #(32) pcmux2(.a(temppc), .b(temppc), .c(ex_mem_alu_result), .d(ex_mem_pc), .sel(ex_mem_mem_signals[4:3] /* PC_Sel */), .out(next_pc));
+    // In case of halting, which is determined in the ID stage by the endProgram signal, pass if_id_pc from the ID stage as well only for consistency. PC load is disabled anyway.
+    mux4x1 #(32) pcmux2(.a(temppc), .b(temppc), .c(ex_mem_alu_result), .d(if_id_pc), .sel(ex_mem_mem_signals[4:3] /* PC_Sel */), .out(next_pc));
 
     wire [31:0] mem_data;
 
     wire [31:0] addr_to_use;
-    /* FIXME: Let DateMem start from address 200 */
-    assign addr_to_use = structural_hazard_stall /* i.e., reading/writing to data memory */ ? (ex_mem_alu_result[7:0] /* + 32'd200 */) : current_pc[7:0];
+    /* FIXME: Let DateMem start from address 200 for the current "Comprehensive Test Program" */
+    assign addr_to_use = structural_hazard_stall /* i.e., reading/writing to data memory */ ? (ex_mem_alu_result /* FIXME: */ + 32'd200) : current_pc;
     wire [31:0] mem_output;
     Mem memory(
         .clk(clk),
         .MemRead(ex_mem_mem_signals[0]),
         .MemWrite(ex_mem_mem_signals[1]),
         .funct3(ex_mem_instr_funct3),
-        .addr(addr_to_use),
+        .addr(addr_to_use[7:0]),
         .data_in(ex_mem_d2),
         .data_out(mem_output)
     );
@@ -269,4 +269,38 @@ module cpu(
     /* START: STAGE 5 - WB */
     mux4x1 #(32) select_wb (.a(mem_wb_alu_result), .b(mem_wb_mem_data), .c(mem_wb_pc_add_four), .d(32'bx), .sel(mem_wb_wb_signals[1:0]), .out(wb_data));
     /* END: STAGE 5 - WB */
+
+    /* FOR FPGA IMPLEMENTATION */
+    // LED output multiplexing
+    reg [15:0] led_output;
+    always @(*) begin
+        case(ledSel)
+            2'b00: led_output = instr_to_use[15:0];
+            2'b01: led_output = instr_to_use[31:16];
+            2'b10: led_output = {1'b0, control_unit_outputs};   // {jalr, jump, branch, memread, aluop [1:0], memwrite, alusrc, regwrite, PC_Sel [1:0], writeData_Sel [1:0], AUIPC_Sel, endProgram}
+            default: led_output = 16'b0;
+        endcase
+    end
+    assign leds = led_output;
+    
+    // SSD output multiplexing
+    reg [12:0] ssd_output;
+    always @(*) begin
+        case(ssdSel)
+            4'b0000: ssd_output = current_pc[12:0];
+            4'b0001: ssd_output = pc_add_four[12:0];
+            4'b0010: ssd_output = pc_shifted_flow[12:0];
+            4'b0011: ssd_output = next_pc[12:0];
+            4'b0100: ssd_output = data1[12:0];
+            4'b0101: ssd_output = data2[12:0];
+            4'b0110: ssd_output = wb_data[12:0];
+            4'b0111: ssd_output = imm[12:0];
+            4'b1000: ssd_output = operand1[12:0];
+            4'b1001: ssd_output = operand2[12:0];
+            4'b1010: ssd_output = alu_result[12:0];
+            4'b1011: ssd_output = mem_data[12:0];
+            default: ssd_output = 13'b0;
+        endcase
+    end
+    assign ssd = ssd_output;
 endmodule
