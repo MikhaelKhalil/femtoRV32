@@ -1,9 +1,10 @@
 from Instruction import Instruction
 from Generator import Generator
 import os
+import random
 
 class Program:
-    def __init__(self, generator, IC = 10):
+    def __init__(self, generator, IC = 20):
         self.generator = generator
         self.generator.set_IC(IC)
         self.IC = IC
@@ -12,9 +13,29 @@ class Program:
 
     def generate(self, type = None):
         try:
+            min_addi_instructions_at_start = 3 # ensure that first 3 instructions are R or I type to get some values into registers
+            window_size = 5 # ensure that every 5 instructions we get at least 1 R/I type
+
+            # curr_RI_count = 0
+            window_instructions = [] # instrucitons in current window size
+
             for i in range(self.IC): # IC is Instruction Count
-                instruction = self.generator.random_instruction(i, type)
+                force_name = None
+
+                if i < min_addi_instructions_at_start: # if at the start of the program, force addi
+                    force_name = "addi"
+                    instruction = self.generator.random_instruction(i, type = "I_TYPE", Name = force_name)
+                else:
+                    if len(window_instructions) >= window_size:
+                        recent_window = window_instructions[-window_size:]
+                        has_addi = any(instr.name == "addi" for instr in recent_window)
+                        if not has_addi:
+                            force_name = "addi"
+
+                    instruction = self.generator.random_instruction(i, type = "I_TYPE" if force_name else type, Name = force_name)
+                    
                 self.instructions.append(instruction)
+                window_instructions.append(instruction)
             
             self._write()
 

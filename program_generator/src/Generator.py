@@ -16,14 +16,19 @@ class Generator:
         self.IC = IC
 
 
-    def random_instruction(self, instruction_index, type =  None):
+    def random_instruction(self, instruction_index, type =  None, Name = None):
         try:
-            if not type: # Randomize type if not user-specified
-                type = random.choice(list(self.encoding_json.keys()))
+            if Name:
+                name = Name
+                encoding = self.encoding_json[type][name]
 
-            # Pick an instruction from the generated Type
-            name = random.choice(list(self.encoding_json[type].keys()))
-            encoding = self.encoding_json[type][name]
+            else:
+                if not type: # Randomize type if not user-specified
+                    type = random.choice(list(self.encoding_json.keys()))
+
+                # Pick an instruction from the generated Type
+                name = random.choice(list(self.encoding_json[type].keys()))
+                encoding = self.encoding_json[type][name]
 
             instruction = Instruction(name, type, encoding)
 
@@ -42,18 +47,20 @@ class Generator:
             if "imm_bits" in encoding:
                 imm_value = 0
 
-                if type == "I_TYPE" and name in ["lw", "lh", "lb", "lhu", "lbu"]:
-                    valid_addr = self._random_memory_address()
-                    if valid_addr is None:
-                        valid_addr = 0
-                        self.memory.mark_valid(valid_addr)
+                if type == "I_TYPE":
+                    if name in ["lw", "lh", "lb", "lhu", "lbu"]:
+                        instruction.rs1 = f"{self._random_source_register():05b}"  # pick valid source
+                        imm_value = 0
+                    else:
+                        instruction.rs1 = f"{self._random_source_register():05b}"
+                        imm_value = random.randint(-2048, 2047)
 
-                    imm_value = valid_addr
 
                 elif type == "S_TYPE" and name in ["sw", "sh", "sb"]:
-                    addr = random.randint(-2048, 2047)
-                    self.memory.mark_valid(addr)
-                    imm_value = addr
+                    # Pick random registers
+                    instruction.rs1 = f"{self._random_destination_register():05b}"
+                    instruction.rs2 = f"{self._random_destination_register():05b}"
+                    imm_value = 0
 
                 elif type == "B_TYPE":
                     min_offset = max((-instruction_index) * 4, -4096)
