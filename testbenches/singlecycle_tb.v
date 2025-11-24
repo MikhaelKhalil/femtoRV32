@@ -13,11 +13,7 @@ module singlecycle_tb();
     
     cpu test_cpu(
         .clk(clk),
-        .rst(rst),
-        .ledSel(),
-        .ssdSel(),
-        .leds(), 
-        .ssd() 
+        .rst(rst)
     );
 
     initial begin
