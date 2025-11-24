@@ -13,12 +13,9 @@ def main():
     with open(json_path, "r") as f:
         encoding = json.load(f)
 
-
-    pprint.pprint(encoding, width = 120)
-
     generator = Generator(encoding)
 
-    program = Program(generator)
+    program = Program(generator, 20)
 
     program.generate()
 
