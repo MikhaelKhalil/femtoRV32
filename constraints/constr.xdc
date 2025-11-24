@@ -46,3 +46,6 @@ set_property -dict { PACKAGE_PIN J17    IOSTANDARD LVCMOS33 } [get_ports { an[0]
 set_property -dict { PACKAGE_PIN J18    IOSTANDARD LVCMOS33 } [get_ports { an[1] }];
 set_property -dict { PACKAGE_PIN T9    IOSTANDARD LVCMOS33 } [get_ports { an[2] }];
 set_property -dict { PACKAGE_PIN J14    IOSTANDARD LVCMOS33 } [get_ports { an[3] }];
+
+# BYPASSING COMBINATIONAL LOOP (ALREADY TAKEN CARE OF THAT IN THE IMPLEMENTATION)
+set_property ALLOW_COMBINATORIAL_LOOPS TRUE [get_nets cpu_inst/if_id/loop[4].generating/regwrite2]
