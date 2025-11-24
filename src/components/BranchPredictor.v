@@ -22,46 +22,42 @@ parameter PREDICTOR_SIZE = (1 << PREDICTOR_SIZE_LOG2);
 reg [1:0] predictor_table [0:PREDICTOR_SIZE-1];
 
 // use lower bits of pc to index the table
-wire [PREDICTOR_SIZE_LOG2-1:0] predict_index;
-wire [PREDICTOR_SIZE_LOG2-1:0] update_index;
+wire [PREDICTOR_SIZE_LOG2-1:0] predict_index = pc[PREDICTOR_SIZE_LOG2+1:2];
+wire [PREDICTOR_SIZE_LOG2-1:0] update_index  = update_pc[PREDICTOR_SIZE_LOG2+1:2];
 
-assign predict_index = pc[PREDICTOR_SIZE_LOG2+1:2]; // using bits [7:2] for 64-entry table
-assign update_index = update_pc[PREDICTOR_SIZE_LOG2+1:2];
 
 // predict combinational
+integer i;
+initial begin
+    for(i = 0; i < PREDICTOR_SIZE; i = i + 1)
+        predictor_table[i] = 2'b01;  // weakly not-taken
+end
 always @(*) begin
-    prediction = predictor_table[predict_index][1]; // MSB
+    prediction = predictor_table[predict_index][1];  // MSB = predicted taken
 end
 
 // update sequential
-integer i;
-always @(posedge clk) begin
-    if(rst) begin
-        // initial prediction is NT, state set to WNT
-        for(i = 0; i < PREDICTOR_SIZE; i = i+1) begin
+always @(posedge clk or posedge rst) begin
+    if (rst) begin
+        for(i = 0; i < PREDICTOR_SIZE; i = i+1)
             predictor_table[i] <= 2'b01;
-        end
-    end else if(update_enable) begin
-        // we will update based on actual outcome 
-        case (predictor_table[update_index]) 
-            2'b00: begin
-                if(actual_taken) predictor_table[update_index] <= 2'b01;
-                // else we dont update
+    end else if (update_enable) begin
+        case (predictor_table[update_index])
+            2'b00: begin // SNT
+                if (actual_taken) predictor_table[update_index] <= 2'b01;
             end
-            2'b01: begin
-                if(actual_taken) predictor_table[update_index] <= 2'b10;
-                else predictor_table[update_index] <= 2'b00;
+            2'b01: begin // WNT
+                predictor_table[update_index] <= actual_taken ? 2'b10 : 2'b00;
             end
-            2'b10: begin
-                if(actual_taken) predictor_table[update_index] <= 2'b11;
-                else predictor_table[update_index] <= 2'b01;
+            2'b10: begin // WT
+                predictor_table[update_index] <= actual_taken ? 2'b11 : 2'b01;
             end
-            2'b11: begin
-                if(!actual_taken) predictor_table[update_index] <= 2'b10;
-                // else stay on ST
+            2'b11: begin // ST
+                if (!actual_taken)
+                    predictor_table[update_index] <= 2'b10;
             end
         endcase
     end
 end
 
-endmodule 
+endmodule
