@@ -89,7 +89,9 @@ module cpu(
     // For Stalling (from the Hazard Detection Unit)    => stall signal
     // and Instruction Flushing                         => shouldJump signal (because the currently used branch predictor is an implicit always-not-taken predictor)
     //                                                  => endProgram signal (passed through the EX/MEM register) to flush successive instructions and halt execution
-    assign {jalr, jump, branch, memread, aluop [1:0], memwrite, alusrc, regwrite, PC_Sel [1:0], writeData_Sel [1:0], AUIPC_Sel, endProgram} = (stall | shouldJump | endProgram) ? 15'b0 : control_unit_outputs;
+    assign {jalr, jump, branch, memread, aluop [1:0], memwrite, alusrc, regwrite, PC_Sel [1:0], writeData_Sel [1:0], AUIPC_Sel, endProgram} = (stall | shouldJump) ? 15'b0 : control_unit_outputs;
+    wire [7:0] signals_to_use_id_ex_mem;
+    assign signals_to_use_id_ex_mem = endProgram ? 7'b0 : {endProgram, jump, jalr, PC_Sel, branch, memwrite, memread};
 
     /* WB => negedge clk */
     wire [31:0] data1, data2;
@@ -126,7 +128,7 @@ module cpu(
         .load(1'b1),
         .clk(clk),
         .rst(rst),
-        .data({ regwrite, writeData_Sel,    endProgram, jump, jalr, PC_Sel, branch, memwrite, memread,    AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      if_id_pc,   if_id_pc_add_four,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2]}),
+        .data({ regwrite, writeData_Sel,    signals_to_use_id_ex_mem,    AUIPC_Sel, alusrc, aluop,   if_id_instr[`IR_shamt],  data1,      data2,      if_id_pc,   if_id_pc_add_four,   imm,          if_id_instr[30],  if_id_instr[14:12],    if_id_instr[`IR_rd],  if_id_instr[`IR_rs1], if_id_instr[`IR_rs2]}),
         .q({    id_ex_wb_signals,           id_ex_mem_signals,                                            id_ex_exc_signals,          id_ex_instr_shamt,       id_ex_d1,   id_ex_d2,   id_ex_pc,   id_ex_pc_add_four,   id_ex_imm,    id_ex_instr_30,   id_ex_instr_funct3,    id_ex_rd,             id_ex_rs1,            id_ex_rs2})
     );
     
@@ -239,7 +241,7 @@ module cpu(
 
     wire [31:0] addr_to_use;
     /* FIXME: Let DateMem start from address 200 for the current "Comprehensive Test Program" */
-    assign addr_to_use = structural_hazard_stall /* i.e., reading/writing to data memory */ ? (ex_mem_alu_result /* FIXME: */ + 32'd200) : current_pc;
+    assign addr_to_use = structural_hazard_stall /* i.e., reading/writing to data memory */ ? (ex_mem_alu_result /* FIXME: + 32'd200 */) : current_pc;
     wire [31:0] mem_output;
     Mem memory(
         .clk(clk),
